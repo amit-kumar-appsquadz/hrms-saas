@@ -1,0 +1,1081 @@
+{
+  "sprints": {
+    "0": {
+      "phase": "P0",
+      "goal": "Planning locked: ADRs, API contract, data model, AWS accounts",
+      "exit_criteria": "ADRs approved; openapi.yaml skeleton and ERD reviewed by you; AWS accounts exist"
+    },
+    "1": {
+      "phase": "P1",
+      "goal": "Repo, local stack, CI, tenancy core",
+      "exit_criteria": "Subdomain resolves a tenant; cross-tenant read blocked by global scope; CI green"
+    },
+    "2": {
+      "phase": "P1",
+      "goal": "Authentication and RBAC",
+      "exit_criteria": "Login + MFA work; role-restricted endpoints verified; auth security review passed"
+    },
+    "3": {
+      "phase": "P1",
+      "goal": "Org structure and employee master",
+      "exit_criteria": "Create/list/edit employees in UI with custom fields; index and N+1 checks pass"
+    },
+    "4": {
+      "phase": "P1",
+      "goal": "Audit log, workflow engine, notifications",
+      "exit_criteria": "Employee changes audited; a sample approval flow runs end to end; PII encryption reviewed"
+    },
+    "5": {
+      "phase": "P1",
+      "goal": "Documents, self-service, bulk import",
+      "exit_criteria": "Upload/download documents; self-service change request approved via workflow; CSV import runs on queue"
+    },
+    "6": {
+      "phase": "P1",
+      "goal": "Phase 1 hardening and exit",
+      "exit_criteria": "Isolation suite green; k6 baseline recorded; security review closed; Phase 1 demo and retro"
+    },
+    "7": {
+      "phase": "P2",
+      "goal": "Leave foundations and staging infra plan",
+      "exit_criteria": "Leave policies and accruals configurable; staging Terraform plan reviewed"
+    },
+    "8": {
+      "phase": "P2",
+      "goal": "Leave requests, approvals, first staging deploy",
+      "exit_criteria": "Employee applies, manager approves, balance updates; app live on staging"
+    },
+    "9": {
+      "phase": "P2",
+      "goal": "Attendance core",
+      "exit_criteria": "Check-in/out with geo-fence; punches flow through SQS; shifts and rosters configurable"
+    },
+    "10": {
+      "phase": "P2",
+      "goal": "Attendance completion and pilot readiness",
+      "exit_criteria": "Biometric push works; regularization via workflow; lean prod environment, alarms, restore test done; FIRST PILOT CUSTOMER"
+    },
+    "11": {
+      "phase": "P3",
+      "goal": "Salary structure and statutory rules spec",
+      "exit_criteria": "Salary components configurable; statutory spec reviewed with payroll expert"
+    },
+    "12": {
+      "phase": "P3",
+      "goal": "Payroll engine core",
+      "exit_criteria": "Gross, LOP and net calc match expert golden cases; Step Functions fan-out working"
+    },
+    "13": {
+      "phase": "P3",
+      "goal": "PF, ESI and Professional Tax",
+      "exit_criteria": "PF/ESI/PT results match expert test cases; ECR export generated"
+    },
+    "14": {
+      "phase": "P3",
+      "goal": "TDS and tax declarations",
+      "exit_criteria": "TDS under old/new regimes verified; employee declaration flow works"
+    },
+    "15": {
+      "phase": "P3",
+      "goal": "Payslips, payroll run UI and statutory reports",
+      "exit_criteria": "End-to-end payroll run on test tenant; payslips PDF; Form 24Q/16 drafts"
+    },
+    "16": {
+      "phase": "P3",
+      "goal": "Expense, loans, F&F and payroll verification",
+      "exit_criteria": "Parallel run against real data verified by expert; Phase 3 exit"
+    }
+  },
+  "tasks": [
+    {
+      "id": "S0-01",
+      "sprint": 0,
+      "phase": "P0",
+      "task": "ADR-001 Tenancy model",
+      "agent": "planner",
+      "human_gate": "You approve",
+      "points": 3,
+      "status": "todo"
+    },
+    {
+      "id": "S0-02",
+      "sprint": 0,
+      "phase": "P0",
+      "task": "ADR-002 AWS topology and accounts",
+      "agent": "planner",
+      "human_gate": "You approve",
+      "points": 3,
+      "status": "todo"
+    },
+    {
+      "id": "S0-03",
+      "sprint": 0,
+      "phase": "P0",
+      "task": "ADR-003 Data stores: MongoDB Atlas (decision made; document it)",
+      "agent": "planner",
+      "human_gate": "You approve",
+      "points": 2,
+      "status": "todo"
+    },
+    {
+      "id": "S0-04",
+      "sprint": 0,
+      "phase": "P0",
+      "task": "ADR-004 Async and queue design",
+      "agent": "planner",
+      "human_gate": "You approve",
+      "points": 2,
+      "status": "todo"
+    },
+    {
+      "id": "S0-05",
+      "sprint": 0,
+      "phase": "P0",
+      "task": "ADR-005 Payroll orchestration (Step Functions)",
+      "agent": "planner",
+      "human_gate": "You approve",
+      "points": 2,
+      "status": "todo"
+    },
+    {
+      "id": "S0-06",
+      "sprint": 0,
+      "phase": "P0",
+      "task": "ADR-006 Security and DPDP",
+      "agent": "planner",
+      "human_gate": "You approve",
+      "points": 3,
+      "status": "todo"
+    },
+    {
+      "id": "S0-07",
+      "sprint": 0,
+      "phase": "P0",
+      "task": "openapi.yaml skeleton (auth, roles, employees)",
+      "agent": "planner",
+      "human_gate": "You review",
+      "points": 5,
+      "status": "todo"
+    },
+    {
+      "id": "S0-08",
+      "sprint": 0,
+      "phase": "P0",
+      "task": "Data model outline (ERD)",
+      "agent": "planner",
+      "human_gate": "You review",
+      "points": 5,
+      "status": "todo"
+    },
+    {
+      "id": "S0-09",
+      "sprint": 0,
+      "phase": "P0",
+      "task": "Create AWS Organization and accounts",
+      "agent": "You",
+      "human_gate": "-",
+      "points": 3,
+      "status": "todo"
+    },
+    {
+      "id": "S0-10",
+      "sprint": 0,
+      "phase": "P0",
+      "task": "Start TRAI DLT registration for SMS",
+      "agent": "You",
+      "human_gate": "-",
+      "points": 2,
+      "status": "todo"
+    },
+    {
+      "id": "S0-11",
+      "sprint": 0,
+      "phase": "P0",
+      "task": "Decide target customer size (SMB vs mid-market)",
+      "agent": "You",
+      "human_gate": "-",
+      "points": 1,
+      "status": "todo"
+    },
+    {
+      "id": "S1-01",
+      "sprint": 1,
+      "phase": "P1",
+      "task": "Scaffold Laravel + Next.js repo",
+      "agent": "backend",
+      "human_gate": "You review diff",
+      "points": 3,
+      "status": "todo"
+    },
+    {
+      "id": "S1-02",
+      "sprint": 1,
+      "phase": "P1",
+      "task": "docker-compose: MySQL, Mongo/Atlas stand-in, Redis, MinIO",
+      "agent": "backend",
+      "human_gate": "You review diff",
+      "points": 3,
+      "status": "todo"
+    },
+    {
+      "id": "S1-03",
+      "sprint": 1,
+      "phase": "P1",
+      "task": "CI pipeline: lint, tests, build",
+      "agent": "backend",
+      "human_gate": "You review diff",
+      "points": 3,
+      "status": "todo"
+    },
+    {
+      "id": "S1-04",
+      "sprint": 1,
+      "phase": "P1",
+      "task": "Tenant model and subdomain resolution middleware",
+      "agent": "backend",
+      "human_gate": "You review diff",
+      "points": 5,
+      "status": "todo"
+    },
+    {
+      "id": "S1-05",
+      "sprint": 1,
+      "phase": "P1",
+      "task": "BelongsToTenant trait and global scope",
+      "agent": "backend",
+      "human_gate": "You review diff",
+      "points": 5,
+      "status": "todo"
+    },
+    {
+      "id": "S1-06",
+      "sprint": 1,
+      "phase": "P1",
+      "task": "Tenant isolation test harness",
+      "agent": "qa",
+      "human_gate": "You review diff",
+      "points": 3,
+      "status": "todo"
+    },
+    {
+      "id": "S1-07",
+      "sprint": 1,
+      "phase": "P1",
+      "task": "Security review of tenancy",
+      "agent": "security-reviewer",
+      "human_gate": "You read report",
+      "points": 2,
+      "status": "todo"
+    },
+    {
+      "id": "S2-01",
+      "sprint": 2,
+      "phase": "P1",
+      "task": "Login, logout, token refresh (Sanctum)",
+      "agent": "backend",
+      "human_gate": "You review diff",
+      "points": 5,
+      "status": "todo"
+    },
+    {
+      "id": "S2-02",
+      "sprint": 2,
+      "phase": "P1",
+      "task": "MFA (TOTP)",
+      "agent": "backend",
+      "human_gate": "You review diff",
+      "points": 5,
+      "status": "todo"
+    },
+    {
+      "id": "S2-03",
+      "sprint": 2,
+      "phase": "P1",
+      "task": "Roles, permissions and policies (RBAC)",
+      "agent": "backend",
+      "human_gate": "You review diff",
+      "points": 8,
+      "status": "todo"
+    },
+    {
+      "id": "S2-04",
+      "sprint": 2,
+      "phase": "P1",
+      "task": "Login and forgot-password screens",
+      "agent": "frontend",
+      "human_gate": "You review diff",
+      "points": 5,
+      "status": "todo"
+    },
+    {
+      "id": "S2-05",
+      "sprint": 2,
+      "phase": "P1",
+      "task": "Auth and cross-tenant tests",
+      "agent": "qa",
+      "human_gate": "You review diff",
+      "points": 3,
+      "status": "todo"
+    },
+    {
+      "id": "S2-06",
+      "sprint": 2,
+      "phase": "P1",
+      "task": "Security review of auth",
+      "agent": "security-reviewer",
+      "human_gate": "You read report",
+      "points": 2,
+      "status": "todo"
+    },
+    {
+      "id": "S3-01",
+      "sprint": 3,
+      "phase": "P1",
+      "task": "Org entities: company, location, department, designation, grade",
+      "agent": "backend",
+      "human_gate": "You review diff",
+      "points": 5,
+      "status": "todo"
+    },
+    {
+      "id": "S3-02",
+      "sprint": 3,
+      "phase": "P1",
+      "task": "Employee master CRUD with custom fields",
+      "agent": "backend",
+      "human_gate": "You review diff",
+      "points": 8,
+      "status": "todo"
+    },
+    {
+      "id": "S3-03",
+      "sprint": 3,
+      "phase": "P1",
+      "task": "Employee list, detail and create UI",
+      "agent": "frontend",
+      "human_gate": "You review diff",
+      "points": 8,
+      "status": "todo"
+    },
+    {
+      "id": "S3-04",
+      "sprint": 3,
+      "phase": "P1",
+      "task": "Composite index and N+1 query tests",
+      "agent": "qa",
+      "human_gate": "You review diff",
+      "points": 3,
+      "status": "todo"
+    },
+    {
+      "id": "S3-05",
+      "sprint": 3,
+      "phase": "P1",
+      "task": "Update openapi.yaml for org and employees",
+      "agent": "planner",
+      "human_gate": "You review",
+      "points": 2,
+      "status": "todo"
+    },
+    {
+      "id": "S4-01",
+      "sprint": 4,
+      "phase": "P1",
+      "task": "Audit log writer interface with Mongo implementation",
+      "agent": "backend",
+      "human_gate": "You review diff",
+      "points": 5,
+      "status": "todo"
+    },
+    {
+      "id": "S4-02",
+      "sprint": 4,
+      "phase": "P1",
+      "task": "Audit viewer UI",
+      "agent": "frontend",
+      "human_gate": "You review diff",
+      "points": 3,
+      "status": "todo"
+    },
+    {
+      "id": "S4-03",
+      "sprint": 4,
+      "phase": "P1",
+      "task": "Approval workflow engine skeleton",
+      "agent": "backend",
+      "human_gate": "You review diff",
+      "points": 8,
+      "status": "todo"
+    },
+    {
+      "id": "S4-04",
+      "sprint": 4,
+      "phase": "P1",
+      "task": "Notification service (email, local mail catcher)",
+      "agent": "backend",
+      "human_gate": "You review diff",
+      "points": 5,
+      "status": "todo"
+    },
+    {
+      "id": "S4-05",
+      "sprint": 4,
+      "phase": "P1",
+      "task": "Workflow and audit tests",
+      "agent": "qa",
+      "human_gate": "You review diff",
+      "points": 3,
+      "status": "todo"
+    },
+    {
+      "id": "S4-06",
+      "sprint": 4,
+      "phase": "P1",
+      "task": "Review field-level encryption for PII",
+      "agent": "security-reviewer",
+      "human_gate": "You read report",
+      "points": 3,
+      "status": "todo"
+    },
+    {
+      "id": "S5-01",
+      "sprint": 5,
+      "phase": "P1",
+      "task": "Document upload via presigned URLs (MinIO locally)",
+      "agent": "backend",
+      "human_gate": "You review diff",
+      "points": 5,
+      "status": "todo"
+    },
+    {
+      "id": "S5-02",
+      "sprint": 5,
+      "phase": "P1",
+      "task": "Employee documents UI",
+      "agent": "frontend",
+      "human_gate": "You review diff",
+      "points": 5,
+      "status": "todo"
+    },
+    {
+      "id": "S5-03",
+      "sprint": 5,
+      "phase": "P1",
+      "task": "Self-service change request via workflow (API)",
+      "agent": "backend",
+      "human_gate": "You review diff",
+      "points": 5,
+      "status": "todo"
+    },
+    {
+      "id": "S5-04",
+      "sprint": 5,
+      "phase": "P1",
+      "task": "Self-service profile UI",
+      "agent": "frontend",
+      "human_gate": "You review diff",
+      "points": 5,
+      "status": "todo"
+    },
+    {
+      "id": "S5-05",
+      "sprint": 5,
+      "phase": "P1",
+      "task": "Bulk employee CSV import on queue",
+      "agent": "backend",
+      "human_gate": "You review diff",
+      "points": 5,
+      "status": "todo"
+    },
+    {
+      "id": "S5-06",
+      "sprint": 5,
+      "phase": "P1",
+      "task": "QA for documents, self-service and import",
+      "agent": "qa",
+      "human_gate": "You review diff",
+      "points": 3,
+      "status": "todo"
+    },
+    {
+      "id": "S6-01",
+      "sprint": 6,
+      "phase": "P1",
+      "task": "k6 baseline on key endpoints",
+      "agent": "performance",
+      "human_gate": "You read report",
+      "points": 3,
+      "status": "todo"
+    },
+    {
+      "id": "S6-02",
+      "sprint": 6,
+      "phase": "P1",
+      "task": "Expand isolation test suite",
+      "agent": "qa",
+      "human_gate": "You review diff",
+      "points": 5,
+      "status": "todo"
+    },
+    {
+      "id": "S6-03",
+      "sprint": 6,
+      "phase": "P1",
+      "task": "Phase 1 security review",
+      "agent": "security-reviewer",
+      "human_gate": "You read report",
+      "points": 5,
+      "status": "todo"
+    },
+    {
+      "id": "S6-04",
+      "sprint": 6,
+      "phase": "P1",
+      "task": "Per-tenant rate limiting",
+      "agent": "backend",
+      "human_gate": "You review diff",
+      "points": 3,
+      "status": "todo"
+    },
+    {
+      "id": "S6-05",
+      "sprint": 6,
+      "phase": "P1",
+      "task": "Bug-fix buffer",
+      "agent": "backend",
+      "human_gate": "You review diff",
+      "points": 5,
+      "status": "todo"
+    },
+    {
+      "id": "S6-06",
+      "sprint": 6,
+      "phase": "P1",
+      "task": "Docs, runbook and Phase 1 demo/retro",
+      "agent": "planner",
+      "human_gate": "You attend",
+      "points": 3,
+      "status": "todo"
+    },
+    {
+      "id": "S7-01",
+      "sprint": 7,
+      "phase": "P2",
+      "task": "Leave types, policies and holiday calendars",
+      "agent": "backend",
+      "human_gate": "You review diff",
+      "points": 8,
+      "status": "todo"
+    },
+    {
+      "id": "S7-02",
+      "sprint": 7,
+      "phase": "P2",
+      "task": "Leave balance and accrual engine",
+      "agent": "backend",
+      "human_gate": "You review diff",
+      "points": 8,
+      "status": "todo"
+    },
+    {
+      "id": "S7-03",
+      "sprint": 7,
+      "phase": "P2",
+      "task": "Terraform plan for staging (VPC, ECS, RDS, ALB)",
+      "agent": "devops",
+      "human_gate": "You review and apply",
+      "points": 8,
+      "status": "todo"
+    },
+    {
+      "id": "S7-04",
+      "sprint": 7,
+      "phase": "P2",
+      "task": "Leave policy UI",
+      "agent": "frontend",
+      "human_gate": "You review diff",
+      "points": 5,
+      "status": "todo"
+    },
+    {
+      "id": "S8-01",
+      "sprint": 8,
+      "phase": "P2",
+      "task": "Leave application and approval via workflow",
+      "agent": "backend",
+      "human_gate": "You review diff",
+      "points": 8,
+      "status": "todo"
+    },
+    {
+      "id": "S8-02",
+      "sprint": 8,
+      "phase": "P2",
+      "task": "Leave UI: apply, calendar, balance",
+      "agent": "frontend",
+      "human_gate": "You review diff",
+      "points": 8,
+      "status": "todo"
+    },
+    {
+      "id": "S8-03",
+      "sprint": 8,
+      "phase": "P2",
+      "task": "Leave tests incl. state-wise rules",
+      "agent": "qa",
+      "human_gate": "You review diff",
+      "points": 5,
+      "status": "todo"
+    },
+    {
+      "id": "S8-04",
+      "sprint": 8,
+      "phase": "P2",
+      "task": "Deploy to staging (CI/CD to ECS)",
+      "agent": "devops",
+      "human_gate": "You review and apply",
+      "points": 5,
+      "status": "todo"
+    },
+    {
+      "id": "S8-05",
+      "sprint": 8,
+      "phase": "P2",
+      "task": "Security review of leave module",
+      "agent": "security-reviewer",
+      "human_gate": "You read report",
+      "points": 3,
+      "status": "todo"
+    },
+    {
+      "id": "S9-01",
+      "sprint": 9,
+      "phase": "P2",
+      "task": "Shifts and rosters",
+      "agent": "backend",
+      "human_gate": "You review diff",
+      "points": 5,
+      "status": "todo"
+    },
+    {
+      "id": "S9-02",
+      "sprint": 9,
+      "phase": "P2",
+      "task": "Check-in/out API with geo-fence",
+      "agent": "backend",
+      "human_gate": "You review diff",
+      "points": 8,
+      "status": "todo"
+    },
+    {
+      "id": "S9-03",
+      "sprint": 9,
+      "phase": "P2",
+      "task": "Punch ingestion endpoint to SQS",
+      "agent": "backend",
+      "human_gate": "You review diff",
+      "points": 5,
+      "status": "todo"
+    },
+    {
+      "id": "S9-04",
+      "sprint": 9,
+      "phase": "P2",
+      "task": "Attendance UI",
+      "agent": "frontend",
+      "human_gate": "You review diff",
+      "points": 8,
+      "status": "todo"
+    },
+    {
+      "id": "S9-05",
+      "sprint": 9,
+      "phase": "P2",
+      "task": "Attendance tests",
+      "agent": "qa",
+      "human_gate": "You review diff",
+      "points": 3,
+      "status": "todo"
+    },
+    {
+      "id": "S10-01",
+      "sprint": 10,
+      "phase": "P2",
+      "task": "Biometric device push endpoint (eSSL/ZKTeco)",
+      "agent": "backend",
+      "human_gate": "You review diff",
+      "points": 5,
+      "status": "todo"
+    },
+    {
+      "id": "S10-02",
+      "sprint": 10,
+      "phase": "P2",
+      "task": "Attendance regularization via workflow",
+      "agent": "backend",
+      "human_gate": "You review diff",
+      "points": 5,
+      "status": "todo"
+    },
+    {
+      "id": "S10-03",
+      "sprint": 10,
+      "phase": "P2",
+      "task": "Attendance reports (API)",
+      "agent": "backend",
+      "human_gate": "You review diff",
+      "points": 3,
+      "status": "todo"
+    },
+    {
+      "id": "S10-04",
+      "sprint": 10,
+      "phase": "P2",
+      "task": "Attendance reports (UI)",
+      "agent": "frontend",
+      "human_gate": "You review diff",
+      "points": 3,
+      "status": "todo"
+    },
+    {
+      "id": "S10-05",
+      "sprint": 10,
+      "phase": "P2",
+      "task": "Load test and performance review",
+      "agent": "performance",
+      "human_gate": "You read report",
+      "points": 3,
+      "status": "todo"
+    },
+    {
+      "id": "S10-06",
+      "sprint": 10,
+      "phase": "P2",
+      "task": "CloudWatch alarms and tracing",
+      "agent": "devops",
+      "human_gate": "You review and apply",
+      "points": 5,
+      "status": "todo"
+    },
+    {
+      "id": "S10-07",
+      "sprint": 10,
+      "phase": "P2",
+      "task": "Lean production environment (Terraform)",
+      "agent": "devops",
+      "human_gate": "You review and apply",
+      "points": 5,
+      "status": "todo"
+    },
+    {
+      "id": "S10-08",
+      "sprint": 10,
+      "phase": "P2",
+      "task": "Pilot onboarding runbook and restore test",
+      "agent": "devops",
+      "human_gate": "You verify",
+      "points": 3,
+      "status": "todo"
+    },
+    {
+      "id": "S11-01",
+      "sprint": 11,
+      "phase": "P3",
+      "task": "Salary components and structures",
+      "agent": "backend",
+      "human_gate": "You review diff",
+      "points": 8,
+      "status": "todo"
+    },
+    {
+      "id": "S11-02",
+      "sprint": 11,
+      "phase": "P3",
+      "task": "Salary structure UI",
+      "agent": "frontend",
+      "human_gate": "You review diff",
+      "points": 5,
+      "status": "todo"
+    },
+    {
+      "id": "S11-03",
+      "sprint": 11,
+      "phase": "P3",
+      "task": "Statutory rules specification (PF, ESI, PT, TDS)",
+      "agent": "compliance-payroll",
+      "human_gate": "Expert verifies",
+      "points": 5,
+      "status": "todo"
+    },
+    {
+      "id": "S11-04",
+      "sprint": 11,
+      "phase": "P3",
+      "task": "Engage payroll/compliance expert",
+      "agent": "You",
+      "human_gate": "-",
+      "points": 3,
+      "status": "todo"
+    },
+    {
+      "id": "S11-05",
+      "sprint": 11,
+      "phase": "P3",
+      "task": "Salary module tests",
+      "agent": "qa",
+      "human_gate": "You review diff",
+      "points": 3,
+      "status": "todo"
+    },
+    {
+      "id": "S12-01",
+      "sprint": 12,
+      "phase": "P3",
+      "task": "Payroll engine core: gross, LOP, net",
+      "agent": "backend",
+      "human_gate": "You review diff",
+      "points": 8,
+      "status": "todo"
+    },
+    {
+      "id": "S12-02",
+      "sprint": 12,
+      "phase": "P3",
+      "task": "Step Functions fan-out for payroll runs",
+      "agent": "devops",
+      "human_gate": "You review and apply",
+      "points": 5,
+      "status": "todo"
+    },
+    {
+      "id": "S12-03",
+      "sprint": 12,
+      "phase": "P3",
+      "task": "Golden test cases with expert",
+      "agent": "qa",
+      "human_gate": "Expert verifies",
+      "points": 5,
+      "status": "todo"
+    },
+    {
+      "id": "S12-04",
+      "sprint": 12,
+      "phase": "P3",
+      "task": "PF/ESI rule detail drafts",
+      "agent": "compliance-payroll",
+      "human_gate": "Expert verifies",
+      "points": 5,
+      "status": "todo"
+    },
+    {
+      "id": "S12-05",
+      "sprint": 12,
+      "phase": "P3",
+      "task": "Security review of salary data encryption",
+      "agent": "security-reviewer",
+      "human_gate": "You read report",
+      "points": 3,
+      "status": "todo"
+    },
+    {
+      "id": "S13-01",
+      "sprint": 13,
+      "phase": "P3",
+      "task": "PF and ESI calculation",
+      "agent": "backend",
+      "human_gate": "Expert verifies",
+      "points": 8,
+      "status": "todo"
+    },
+    {
+      "id": "S13-02",
+      "sprint": 13,
+      "phase": "P3",
+      "task": "State-wise Professional Tax",
+      "agent": "backend",
+      "human_gate": "Expert verifies",
+      "points": 5,
+      "status": "todo"
+    },
+    {
+      "id": "S13-03",
+      "sprint": 13,
+      "phase": "P3",
+      "task": "Statutory verification pass",
+      "agent": "compliance-payroll",
+      "human_gate": "Expert verifies",
+      "points": 5,
+      "status": "todo"
+    },
+    {
+      "id": "S13-04",
+      "sprint": 13,
+      "phase": "P3",
+      "task": "Statutory test suite",
+      "agent": "qa",
+      "human_gate": "Expert verifies",
+      "points": 5,
+      "status": "todo"
+    },
+    {
+      "id": "S13-05",
+      "sprint": 13,
+      "phase": "P3",
+      "task": "ECR export",
+      "agent": "backend",
+      "human_gate": "Expert verifies",
+      "points": 3,
+      "status": "todo"
+    },
+    {
+      "id": "S14-01",
+      "sprint": 14,
+      "phase": "P3",
+      "task": "TDS calculation: old and new regimes",
+      "agent": "backend",
+      "human_gate": "Expert verifies",
+      "points": 8,
+      "status": "todo"
+    },
+    {
+      "id": "S14-02",
+      "sprint": 14,
+      "phase": "P3",
+      "task": "Tax declaration and investment proof UI",
+      "agent": "frontend",
+      "human_gate": "You review diff",
+      "points": 5,
+      "status": "todo"
+    },
+    {
+      "id": "S14-03",
+      "sprint": 14,
+      "phase": "P3",
+      "task": "TDS rules verification",
+      "agent": "compliance-payroll",
+      "human_gate": "Expert verifies",
+      "points": 5,
+      "status": "todo"
+    },
+    {
+      "id": "S14-04",
+      "sprint": 14,
+      "phase": "P3",
+      "task": "TDS test suite",
+      "agent": "qa",
+      "human_gate": "Expert verifies",
+      "points": 5,
+      "status": "todo"
+    },
+    {
+      "id": "S15-01",
+      "sprint": 15,
+      "phase": "P3",
+      "task": "Payslip PDF generation (Lambda)",
+      "agent": "backend",
+      "human_gate": "You review diff",
+      "points": 5,
+      "status": "todo"
+    },
+    {
+      "id": "S15-02",
+      "sprint": 15,
+      "phase": "P3",
+      "task": "Payroll run UI: preview, approve, lock",
+      "agent": "frontend",
+      "human_gate": "You review diff",
+      "points": 8,
+      "status": "todo"
+    },
+    {
+      "id": "S15-03",
+      "sprint": 15,
+      "phase": "P3",
+      "task": "Form 24Q / Form 16 report drafts",
+      "agent": "backend",
+      "human_gate": "Expert verifies",
+      "points": 8,
+      "status": "todo"
+    },
+    {
+      "id": "S15-04",
+      "sprint": 15,
+      "phase": "P3",
+      "task": "End-to-end payroll tests",
+      "agent": "qa",
+      "human_gate": "You review diff",
+      "points": 3,
+      "status": "todo"
+    },
+    {
+      "id": "S15-05",
+      "sprint": 15,
+      "phase": "P3",
+      "task": "Payroll run performance test",
+      "agent": "performance",
+      "human_gate": "You read report",
+      "points": 3,
+      "status": "todo"
+    },
+    {
+      "id": "S16-01",
+      "sprint": 16,
+      "phase": "P3",
+      "task": "Expense claims (API and UI)",
+      "agent": "backend",
+      "human_gate": "You review diff",
+      "points": 5,
+      "status": "todo"
+    },
+    {
+      "id": "S16-02",
+      "sprint": 16,
+      "phase": "P3",
+      "task": "Expense claims UI",
+      "agent": "frontend",
+      "human_gate": "You review diff",
+      "points": 5,
+      "status": "todo"
+    },
+    {
+      "id": "S16-03",
+      "sprint": 16,
+      "phase": "P3",
+      "task": "Loans and advances",
+      "agent": "backend",
+      "human_gate": "You review diff",
+      "points": 3,
+      "status": "todo"
+    },
+    {
+      "id": "S16-04",
+      "sprint": 16,
+      "phase": "P3",
+      "task": "Full and final settlement",
+      "agent": "backend",
+      "human_gate": "Expert verifies",
+      "points": 5,
+      "status": "todo"
+    },
+    {
+      "id": "S16-05",
+      "sprint": 16,
+      "phase": "P3",
+      "task": "Parallel run and expert verification",
+      "agent": "You",
+      "human_gate": "Expert verifies",
+      "points": 5,
+      "status": "todo"
+    },
+    {
+      "id": "S16-06",
+      "sprint": 16,
+      "phase": "P3",
+      "task": "Phase 3 security review",
+      "agent": "security-reviewer",
+      "human_gate": "You read report",
+      "points": 3,
+      "status": "todo"
+    }
+  ]
+}
