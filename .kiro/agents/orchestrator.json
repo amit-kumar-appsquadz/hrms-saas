@@ -1,0 +1,81 @@
+{
+  "name": "orchestrator",
+  "description": "Sprint orchestrator: reads tasks/backlog.json and delegates to the specialist agents. Use for 'run sprint N'.",
+  "prompt": "file://./prompts/orchestrator.md",
+  "tools": [
+    "read",
+    "write",
+    "subagent"
+  ],
+  "permissions": {
+    "rules": [
+      {
+        "capability": "fs_read",
+        "match": [
+          "**"
+        ],
+        "effect": "allow"
+      },
+      {
+        "capability": "fs_read",
+        "match": [
+          ".env",
+          ".env.*",
+          "**/.env",
+          "**/.env.*",
+          "**/*.pem"
+        ],
+        "effect": "deny"
+      },
+      {
+        "capability": "fs_write",
+        "match": [
+          "docs/status/**"
+        ],
+        "effect": "allow"
+      },
+      {
+        "capability": "subagent",
+        "match": [
+          "backend",
+          "compliance-payroll",
+          "devops",
+          "frontend",
+          "performance",
+          "planner",
+          "qa",
+          "security-reviewer"
+        ],
+        "effect": "allow"
+      }
+    ]
+  },
+  "toolsSettings": {
+    "subagent": {
+      "availableAgents": [
+        "backend",
+        "compliance-payroll",
+        "devops",
+        "frontend",
+        "performance",
+        "planner",
+        "qa",
+        "security-reviewer"
+      ],
+      "trustedAgents": [
+        "backend",
+        "compliance-payroll",
+        "devops",
+        "frontend",
+        "performance",
+        "planner",
+        "qa",
+        "security-reviewer"
+      ]
+    }
+  },
+  "resources": [
+    "file://.kiro/steering/**/*.md"
+  ],
+  "includeMcpJson": false
+}

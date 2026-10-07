@@ -1,0 +1,59 @@
+{
+  "name": "compliance-payroll",
+  "description": "India payroll and statutory compliance specialist (active from Sprint 11). Drafts PF, ESI, Professional Tax, TDS, gratuity, bonus rules and reports. All output must be verified by a human expert.",
+  "prompt": "file://./prompts/compliance-payroll.md",
+  "tools": [
+    "read",
+    "write"
+  ],
+  "permissions": {
+    "rules": [
+      {
+        "capability": "fs_read",
+        "match": [
+          "**"
+        ],
+        "effect": "allow"
+      },
+      {
+        "capability": "fs_read",
+        "match": [
+          ".env",
+          ".env.*",
+          "**/.env",
+          "**/.env.*",
+          "**/*.pem"
+        ],
+        "effect": "deny"
+      },
+      {
+        "capability": "fs_write",
+        "match": [
+          "docs/payroll/**",
+          "backend/config/statutory/**",
+          "docs/notes/**"
+        ],
+        "effect": "allow"
+      },
+      {
+        "capability": "shell",
+        "match": [
+          "sudo *",
+          "rm -rf *",
+          "terraform apply",
+          "terraform apply *",
+          "terraform destroy",
+          "terraform destroy *",
+          "git push",
+          "git push *",
+          "aws *"
+        ],
+        "effect": "deny"
+      }
+    ]
+  },
+  "resources": [
+    "file://.kiro/steering/**/*.md"
+  ],
+  "includeMcpJson": false
+}

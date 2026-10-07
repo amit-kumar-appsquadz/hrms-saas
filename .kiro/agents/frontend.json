@@ -1,0 +1,71 @@
+{
+  "name": "frontend",
+  "description": "Next.js frontend engineer. Use for UI screens, forms, state, API client code and accessibility. Works from openapi.yaml.",
+  "prompt": "file://./prompts/frontend.md",
+  "tools": [
+    "read",
+    "write",
+    "shell"
+  ],
+  "permissions": {
+    "rules": [
+      {
+        "capability": "fs_read",
+        "match": [
+          "**"
+        ],
+        "effect": "allow"
+      },
+      {
+        "capability": "fs_read",
+        "match": [
+          ".env",
+          ".env.*",
+          "**/.env",
+          "**/.env.*",
+          "**/*.pem"
+        ],
+        "effect": "deny"
+      },
+      {
+        "capability": "fs_write",
+        "match": [
+          "frontend/**",
+          "docs/notes/**"
+        ],
+        "effect": "allow"
+      },
+      {
+        "capability": "shell",
+        "match": [
+          "npm *",
+          "npx *",
+          "pnpm *",
+          "node *",
+          "git *",
+          "ls *"
+        ],
+        "effect": "allow"
+      },
+      {
+        "capability": "shell",
+        "match": [
+          "sudo *",
+          "rm -rf *",
+          "terraform apply",
+          "terraform apply *",
+          "terraform destroy",
+          "terraform destroy *",
+          "git push",
+          "git push *",
+          "aws *"
+        ],
+        "effect": "deny"
+      }
+    ]
+  },
+  "resources": [
+    "file://.kiro/steering/**/*.md"
+  ],
+  "includeMcpJson": false
+}

@@ -1,0 +1,17 @@
+# secrets and local config
+.env
+.env.*
+!.env.example
+*.pem
+# dependencies / builds
+backend/vendor/
+frontend/node_modules/
+frontend/.next/
+# terraform
+**/.terraform/
+*.tfstate
+*.tfstate.*
+*.tfplan
+# misc
+.DS_Store
+*.log

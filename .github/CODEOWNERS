@@ -1,0 +1,10 @@
+# Replace @your-github-username. Pair with branch protection: "Require review from Code Owners".
+# Sensitive areas always need a human owner review.
+*                         @amit-kumar-appsquadz
+/backend/app/Tenancy/     @amit-kumar-appsquadz
+/backend/app/Auth/        @amit-kumar-appsquadz
+/backend/app/Payroll/     @amit-kumar-appsquadz
+/backend/config/statutory/ @amit-kumar-appsquadz
+/infra/                   @amit-kumar-appsquadz
+/.kiro/                   @amit-kumar-appsquadz
+/openapi.yaml             @amit-kumar-appsquadz

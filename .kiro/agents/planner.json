@@ -1,0 +1,69 @@
+{
+  "name": "planner",
+  "description": "Architecture and planning specialist. Use for ADRs, openapi.yaml changes, data model/ERD, task breakdowns and project docs. Does not write application code.",
+  "prompt": "file://./prompts/planner.md",
+  "tools": [
+    "read",
+    "write"
+  ],
+  "permissions": {
+    "rules": [
+      {
+        "capability": "fs_read",
+        "match": [
+          "**"
+        ],
+        "effect": "allow"
+      },
+      {
+        "capability": "fs_read",
+        "match": [
+          ".env",
+          ".env.*",
+          "**/.env",
+          "**/.env.*",
+          "**/*.pem"
+        ],
+        "effect": "deny"
+      },
+      {
+        "capability": "fs_write",
+        "match": [
+          "docs/**",
+          "openapi.yaml",
+          "tasks/**"
+        ],
+        "effect": "allow"
+      },
+      {
+        "capability": "shell",
+        "match": [
+          "git status*",
+          "git diff*",
+          "git log*",
+          "ls *"
+        ],
+        "effect": "allow"
+      },
+      {
+        "capability": "shell",
+        "match": [
+          "sudo *",
+          "rm -rf *",
+          "terraform apply",
+          "terraform apply *",
+          "terraform destroy",
+          "terraform destroy *",
+          "git push",
+          "git push *",
+          "aws *"
+        ],
+        "effect": "deny"
+      }
+    ]
+  },
+  "resources": [
+    "file://.kiro/steering/**/*.md"
+  ],
+  "includeMcpJson": false
+}

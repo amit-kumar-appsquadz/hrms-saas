@@ -1,0 +1,83 @@
+{
+  "name": "devops",
+  "description": "DevOps/infra engineer (active from Sprint 7). Use for Terraform, CI/CD, Docker, observability and deployment pipelines on AWS. Plans only; never applies.",
+  "prompt": "file://./prompts/devops.md",
+  "tools": [
+    "read",
+    "write",
+    "shell"
+  ],
+  "permissions": {
+    "rules": [
+      {
+        "capability": "fs_read",
+        "match": [
+          "**"
+        ],
+        "effect": "allow"
+      },
+      {
+        "capability": "fs_read",
+        "match": [
+          ".env",
+          ".env.*",
+          "**/.env",
+          "**/.env.*",
+          "**/*.pem"
+        ],
+        "effect": "deny"
+      },
+      {
+        "capability": "fs_write",
+        "match": [
+          "infra/**",
+          ".github/**",
+          "docker/**",
+          "Dockerfile*",
+          "docs/infra/**",
+          "docs/notes/**"
+        ],
+        "effect": "allow"
+      },
+      {
+        "capability": "shell",
+        "match": [
+          "terraform fmt*",
+          "terraform validate*",
+          "terraform init*",
+          "terraform plan*",
+          "tflint*",
+          "tfsec*",
+          "checkov*",
+          "git status*",
+          "git diff*",
+          "git add*",
+          "git commit*",
+          "docker compose *",
+          "docker-compose *",
+          "ls *"
+        ],
+        "effect": "allow"
+      },
+      {
+        "capability": "shell",
+        "match": [
+          "sudo *",
+          "rm -rf *",
+          "terraform apply",
+          "terraform apply *",
+          "terraform destroy",
+          "terraform destroy *",
+          "git push",
+          "git push *",
+          "aws *"
+        ],
+        "effect": "deny"
+      }
+    ]
+  },
+  "resources": [
+    "file://.kiro/steering/**/*.md"
+  ],
+  "includeMcpJson": false
+}

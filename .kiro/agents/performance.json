@@ -1,0 +1,72 @@
+{
+  "name": "performance",
+  "description": "Performance engineer. Use for load tests (k6), slow-query and index review, caching strategy and latency budgets. Reports findings; does not modify product code.",
+  "prompt": "file://./prompts/performance.md",
+  "tools": [
+    "read",
+    "write",
+    "shell"
+  ],
+  "permissions": {
+    "rules": [
+      {
+        "capability": "fs_read",
+        "match": [
+          "**"
+        ],
+        "effect": "allow"
+      },
+      {
+        "capability": "fs_read",
+        "match": [
+          ".env",
+          ".env.*",
+          "**/.env",
+          "**/.env.*",
+          "**/*.pem"
+        ],
+        "effect": "deny"
+      },
+      {
+        "capability": "fs_write",
+        "match": [
+          "tests/load/**",
+          "docs/perf/**"
+        ],
+        "effect": "allow"
+      },
+      {
+        "capability": "shell",
+        "match": [
+          "k6 *",
+          "git status*",
+          "git diff*",
+          "docker compose *",
+          "docker-compose *",
+          "mysql *",
+          "ls *"
+        ],
+        "effect": "allow"
+      },
+      {
+        "capability": "shell",
+        "match": [
+          "sudo *",
+          "rm -rf *",
+          "terraform apply",
+          "terraform apply *",
+          "terraform destroy",
+          "terraform destroy *",
+          "git push",
+          "git push *",
+          "aws *"
+        ],
+        "effect": "deny"
+      }
+    ]
+  },
+  "resources": [
+    "file://.kiro/steering/**/*.md"
+  ],
+  "includeMcpJson": false
+}

@@ -1,0 +1,80 @@
+{
+  "name": "qa",
+  "description": "QA and test engineer. Use after implementation to write feature, integration and cross-tenant isolation tests, and to find bugs. Prefer reporting product-code bugs over silently changing them.",
+  "prompt": "file://./prompts/qa.md",
+  "tools": [
+    "read",
+    "write",
+    "shell"
+  ],
+  "permissions": {
+    "rules": [
+      {
+        "capability": "fs_read",
+        "match": [
+          "**"
+        ],
+        "effect": "allow"
+      },
+      {
+        "capability": "fs_read",
+        "match": [
+          ".env",
+          ".env.*",
+          "**/.env",
+          "**/.env.*",
+          "**/*.pem"
+        ],
+        "effect": "deny"
+      },
+      {
+        "capability": "fs_write",
+        "match": [
+          "backend/tests/**",
+          "frontend/tests/**",
+          "frontend/**/__tests__/**",
+          "tests/**",
+          "docs/notes/**"
+        ],
+        "effect": "allow"
+      },
+      {
+        "capability": "shell",
+        "match": [
+          "php *",
+          "composer *",
+          "npm *",
+          "npx *",
+          "git *",
+          "docker compose *",
+          "docker-compose *",
+          "make *",
+          "./vendor/bin/*",
+          "vendor/bin/*",
+          "mkdir *",
+          "ls *"
+        ],
+        "effect": "allow"
+      },
+      {
+        "capability": "shell",
+        "match": [
+          "sudo *",
+          "rm -rf *",
+          "terraform apply",
+          "terraform apply *",
+          "terraform destroy",
+          "terraform destroy *",
+          "git push",
+          "git push *",
+          "aws *"
+        ],
+        "effect": "deny"
+      }
+    ]
+  },
+  "resources": [
+    "file://.kiro/steering/**/*.md"
+  ],
+  "includeMcpJson": false
+}
