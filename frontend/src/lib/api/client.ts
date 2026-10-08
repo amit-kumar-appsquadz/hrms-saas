@@ -13,7 +13,7 @@
  * It never invents endpoints: callers pass paths that exist in openapi.yaml.
  */
 
-import { apiBaseUrl } from "../config";
+import { apiBaseUrl, platformApiBaseUrl } from "../config";
 import { resolveTenantFromHost } from "../tenant";
 
 export class ApiRequestError extends Error {
@@ -68,6 +68,31 @@ export async function apiFetch<T>(
   options: RequestOptions = {},
 ): Promise<T> {
   const base = apiBaseUrl(currentTenant());
+  return request<T>(base, path, options);
+}
+
+/**
+ * Platform-plane fetch (ADR-007). Targets the base-domain /platform API — NOT a
+ * tenant subdomain — and carries the PLATFORM token (audience "platform"),
+ * which is stored separately from the tenant token. The server enforces the
+ * audience/namespace/identity boundary; this helper only ensures the FE never
+ * sends a tenant-scoped URL or a tenant token to a platform endpoint.
+ *
+ * Callers pass paths that exist under /platform in openapi.yaml (e.g.
+ * "/summary", "/tenants", "/audit"); endpoints are never invented.
+ */
+export async function apiFetchPlatform<T>(
+  path: string,
+  options: RequestOptions = {},
+): Promise<T> {
+  return request<T>(platformApiBaseUrl(), path, options);
+}
+
+async function request<T>(
+  base: string,
+  path: string,
+  options: RequestOptions = {},
+): Promise<T> {
   const url = `${base}${path}${buildQuery(options.query)}`;
 
   const headers: Record<string, string> = {

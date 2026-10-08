@@ -14,8 +14,25 @@
  * production endpoint is invented — these are served by the demo layer.
  */
 
-export type TenantStatus = "active" | "trial" | "suspended" | "provisioning";
+/**
+ * Tenant lifecycle status (ADR-008). Authoritative set:
+ *   provisioning → trial → active → suspended → inactive
+ * `inactive` is the terminal churned/offboarded state (drives DPDP retention),
+ * distinct from the reversible `suspended`. Mirrors openapi.yaml `TenantStatus`.
+ */
+export type TenantStatus = "provisioning" | "trial" | "active" | "suspended" | "inactive";
 export type PlanTier = "starter" | "growth" | "enterprise";
+
+/**
+ * Fixed platform role enum (ADR-007 §4 / backend B1-03). These are the ONLY
+ * platform roles; configurable platform RBAC is a documented future extension.
+ * Mirrors openapi.yaml `PlatformRole`. NOT tenant roles.
+ */
+export type PlatformRole =
+  | "PLATFORM_SUPER_ADMIN"
+  | "PLATFORM_SUPPORT"
+  | "PLATFORM_OPERATIONS"
+  | "PLATFORM_AUDITOR";
 
 export interface PlatformTenant {
   id: number;
@@ -53,7 +70,7 @@ export interface PlatformUser {
   id: number;
   name: string;
   email: string;
-  platform_role: "Super Admin" | "Platform Operator" | "Support Engineer" | "Billing Admin";
+  platform_role: PlatformRole;
   status: "active" | "invited" | "disabled";
   mfa: boolean;
   last_login: string | null;

@@ -36,7 +36,7 @@ const TENANT_NAMES: { name: string; sub: string; contact: string; admin: string 
 ];
 
 const PLANS: PlanTier[] = ["enterprise", "growth", "growth", "starter", "enterprise", "growth", "starter", "growth", "starter", "growth", "enterprise", "starter", "growth", "starter"];
-const STATUSES: TenantStatus[] = ["active", "active", "active", "trial", "active", "active", "trial", "active", "suspended", "active", "active", "trial", "active", "provisioning"];
+const STATUSES: TenantStatus[] = ["active", "active", "active", "trial", "active", "active", "trial", "active", "suspended", "active", "active", "trial", "inactive", "provisioning"];
 const REGIONS = ["ap-south-1 (Mumbai)", "ap-south-1 (Mumbai)", "ap-south-2 (Hyderabad)"];
 
 function price(plan: PlanTier): number {
@@ -46,7 +46,8 @@ function price(plan: PlanTier): number {
 export const platformTenants: PlatformTenant[] = TENANT_NAMES.map((t, i) => {
   const plan = PLANS[i]!;
   const status = STATUSES[i]!;
-  const employees = status === "provisioning" ? 0 : 40 + ((i * 137) % 1800);
+  const dormant = status === "provisioning" || status === "inactive";
+  const employees = dormant ? 0 : 40 + ((i * 137) % 1800);
   const mrr = status === "active" ? employees * price(plan) : 0;
   return {
     id: i + 1,
@@ -66,7 +67,7 @@ export const platformTenants: PlatformTenant[] = TENANT_NAMES.map((t, i) => {
     mrr,
     storage_gb: Math.round((employees / 50) * 1.4 * 10) / 10,
     api_calls_30d: employees * 1200 + ((i * 9973) % 50000),
-    health: status === "suspended" ? "down" : i % 7 === 0 ? "degraded" : "healthy",
+    health: status === "suspended" || status === "inactive" ? "down" : i % 7 === 0 ? "degraded" : "healthy",
   };
 });
 
@@ -81,18 +82,18 @@ export const platformOnboarding: PlatformTenantOnboarding[] = [
 ];
 
 export const platformUsers: PlatformUser[] = [
-  { id: 1, name: "Platform Super Admin", email: "superadmin@platform.example.com", platform_role: "Super Admin", status: "active", mfa: true, last_login: "2024-07-15T09:10:00+05:30" },
-  { id: 2, name: "Ops — Deepa R", email: "deepa@platform.example.com", platform_role: "Platform Operator", status: "active", mfa: true, last_login: "2024-07-15T08:40:00+05:30" },
-  { id: 3, name: "Support — Vivek N", email: "vivek@platform.example.com", platform_role: "Support Engineer", status: "active", mfa: true, last_login: "2024-07-14T18:20:00+05:30" },
-  { id: 4, name: "Billing — Anita K", email: "anita@platform.example.com", platform_role: "Billing Admin", status: "active", mfa: false, last_login: "2024-07-13T11:00:00+05:30" },
-  { id: 5, name: "Ops — Rohan M", email: "rohan@platform.example.com", platform_role: "Platform Operator", status: "invited", mfa: false, last_login: null },
+  { id: 1, name: "Platform Super Admin", email: "superadmin@platform.example.com", platform_role: "PLATFORM_SUPER_ADMIN", status: "active", mfa: true, last_login: "2024-07-15T09:10:00+05:30" },
+  { id: 2, name: "Ops — Deepa R", email: "deepa@platform.example.com", platform_role: "PLATFORM_OPERATIONS", status: "active", mfa: true, last_login: "2024-07-15T08:40:00+05:30" },
+  { id: 3, name: "Support — Vivek N", email: "vivek@platform.example.com", platform_role: "PLATFORM_SUPPORT", status: "active", mfa: true, last_login: "2024-07-14T18:20:00+05:30" },
+  { id: 4, name: "Audit — Anita K", email: "anita@platform.example.com", platform_role: "PLATFORM_AUDITOR", status: "active", mfa: false, last_login: "2024-07-13T11:00:00+05:30" },
+  { id: 5, name: "Ops — Rohan M", email: "rohan@platform.example.com", platform_role: "PLATFORM_OPERATIONS", status: "invited", mfa: false, last_login: null },
 ];
 
 export const platformAudit: PlatformAuditEntry[] = [
   { id: 1, timestamp: "2024-07-15T09:12:00+05:30", actor: "Platform Super Admin", action: "tenant.suspended", target: "Vehement Capital", category: "tenant_lifecycle", ip: "203.0.113.9", device: "Chrome · macOS" },
   { id: 2, timestamp: "2024-07-14T16:05:00+05:30", actor: "Ops — Deepa R", action: "tenant.created", target: "Lumen Energy", category: "tenant_lifecycle", ip: "203.0.113.4", device: "Firefox · Windows" },
   { id: 3, timestamp: "2024-07-14T11:30:00+05:30", actor: "Platform Super Admin", action: "plan.updated", target: "Growth plan — price change", category: "billing", ip: "203.0.113.9", device: "Chrome · macOS" },
-  { id: 4, timestamp: "2024-07-13T19:45:00+05:30", actor: "Support — Vivek N", action: "tenant.impersonated", target: "Umbrella Retail (support session)", category: "access", ip: "203.0.113.21", device: "Chrome · Windows" },
+  { id: 4, timestamp: "2024-07-13T19:45:00+05:30", actor: "Support — Vivek N", action: "tenant.access_session.started", target: "Umbrella Retail (read-only access session)", category: "access", ip: "203.0.113.21", device: "Chrome · Windows" },
   { id: 5, timestamp: "2024-07-13T10:15:00+05:30", actor: "Ops — Deepa R", action: "tenant.activated", target: "Massive Dynamic", category: "tenant_lifecycle", ip: "203.0.113.4", device: "Firefox · Windows" },
   { id: 6, timestamp: "2024-07-12T14:00:00+05:30", actor: "Platform Super Admin", action: "platform_setting.updated", target: "Default session timeout → 30m", category: "platform_config", ip: "203.0.113.9", device: "Chrome · macOS" },
   { id: 7, timestamp: "2024-07-12T08:50:00+05:30", actor: "Platform Super Admin", action: "platform_user.invited", target: "rohan@platform.example.com", category: "access", ip: "203.0.113.9", device: "Chrome · macOS" },
@@ -135,6 +136,7 @@ export const platformSummary: PlatformSummary = {
     { label: "Trial", value: platformTenants.filter((t) => t.status === "trial").length, color: "#B7791F" },
     { label: "Suspended", value: platformTenants.filter((t) => t.status === "suspended").length, color: "#C0392B" },
     { label: "Provisioning", value: platformTenants.filter((t) => t.status === "provisioning").length, color: "#1C6E8C" },
+    { label: "Inactive", value: platformTenants.filter((t) => t.status === "inactive").length, color: "#5B636C" },
   ],
   system_health: [
     { service: "API (ap-south-1)", status: "operational", uptime: "99.98%" },

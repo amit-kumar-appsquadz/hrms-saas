@@ -16,6 +16,12 @@ export const config = {
   apiBaseUrlTemplate:
     process.env.NEXT_PUBLIC_API_BASE_URL ||
     "https://{tenant}.app.example.com/api/v1",
+  // Platform plane (ADR-007): served from the SAME base domain under /platform/*
+  // — NOT a tenant subdomain and NOT a separate admin host. The platform API
+  // base is therefore the apex host, never tenant-scoped.
+  platformApiBaseUrl:
+    process.env.NEXT_PUBLIC_PLATFORM_API_BASE_URL ||
+    "https://app.example.com/api/v1/platform",
 } as const;
 
 export const isDemo = config.dataMode === "demo";
@@ -23,4 +29,9 @@ export const isDemo = config.dataMode === "demo";
 /** Build the tenant-scoped API base URL from a resolved subdomain slug. */
 export function apiBaseUrl(tenant: string): string {
   return config.apiBaseUrlTemplate.replace("{tenant}", tenant);
+}
+
+/** Platform-plane API base URL (base domain, no tenant scope — ADR-007). */
+export function platformApiBaseUrl(): string {
+  return config.platformApiBaseUrl;
 }

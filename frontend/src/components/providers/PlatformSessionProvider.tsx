@@ -2,7 +2,8 @@
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
-import { getPlatformIdentity, platformRoles, type PlatformIdentity, type PlatformRoleSlug } from "@/services/platformAuth";
+import { getPlatformIdentity, platformRoles, type PlatformIdentity } from "@/services/platformAuth";
+import type { PlatformRole } from "@/lib/platformRoles";
 import { clearPlatformSession, isPlatformAuthenticated } from "@/lib/session";
 
 interface PlatformSessionValue {
@@ -10,8 +11,8 @@ interface PlatformSessionValue {
   loading: boolean;
   can: (permission: string) => boolean;
   canAny: (permissions: string[]) => boolean;
-  role: PlatformRoleSlug;
-  setRole: (slug: PlatformRoleSlug) => void;
+  role: PlatformRole;
+  setRole: (role: PlatformRole) => void;
   signOut: () => void;
 }
 
@@ -21,17 +22,18 @@ const ROLE_KEY = "hrms.demo.platform.role";
 
 /**
  * PLATFORM permission context — fully separate from the tenant SessionProvider.
- * Super Admin is platform-level; this provider never reads tenant permissions.
+ * The platform operator is platform-level; this provider never reads tenant
+ * permissions. Roles are the FIXED PlatformRole enum (ADR-007 §4 / B1-03).
  */
 export function PlatformSessionProvider({ children }: { children: ReactNode }) {
   const router = useRouter();
   const [identity, setIdentity] = useState<PlatformIdentity>();
   const [loading, setLoading] = useState(true);
-  const [role, setRoleState] = useState<PlatformRoleSlug>("super-admin");
+  const [role, setRoleState] = useState<PlatformRole>("PLATFORM_SUPER_ADMIN");
 
-  const load = useCallback((slug: PlatformRoleSlug) => {
+  const load = useCallback((r: PlatformRole) => {
     setLoading(true);
-    getPlatformIdentity(slug)
+    getPlatformIdentity(r)
       .then(setIdentity)
       .finally(() => setLoading(false));
   }, []);
@@ -42,22 +44,23 @@ export function PlatformSessionProvider({ children }: { children: ReactNode }) {
       router.replace("/platform/login");
       return;
     }
-    const stored = (typeof window !== "undefined" && (localStorage.getItem(ROLE_KEY) as PlatformRoleSlug)) || "super-admin";
+    const stored = (typeof window !== "undefined" && (localStorage.getItem(ROLE_KEY) as PlatformRole)) || "PLATFORM_SUPER_ADMIN";
     setRoleState(stored);
     load(stored);
   }, [load, router]);
 
   const setRole = useCallback(
-    (slug: PlatformRoleSlug) => {
-      if (typeof window !== "undefined") localStorage.setItem(ROLE_KEY, slug);
-      setRoleState(slug);
-      load(slug);
+    (r: PlatformRole) => {
+      if (typeof window !== "undefined") localStorage.setItem(ROLE_KEY, r);
+      setRoleState(r);
+      load(r);
     },
     [load],
   );
 
   const can = useCallback(
-    (permission: string) => (identity ? identity.permissions.includes(permission) : false),
+    (permission: string) =>
+      identity ? (identity.permissions as readonly string[]).includes(permission) : false,
     [identity],
   );
   const canAny = useCallback(

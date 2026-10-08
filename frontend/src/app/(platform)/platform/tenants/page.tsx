@@ -62,7 +62,7 @@ export default function TenantsPage() {
     { key: "mrr", header: "MRR", render: (t) => formatINR(t.mrr), align: "right", secondary: true },
     { key: "region", header: "Region", render: (t) => t.region, secondary: true },
     { key: "created", header: "Created", render: (t) => formatDate(t.created_at), secondary: true },
-    { key: "status", header: "Status", render: (t) => <StatusBadge status={t.status === "provisioning" ? "in_progress" : t.status} /> },
+    { key: "status", header: "Status", render: (t) => <StatusBadge status={t.status} /> },
   ];
 
   return (
@@ -91,6 +91,7 @@ export default function TenantsPage() {
             { value: "trial", label: "Trial" },
             { value: "suspended", label: "Suspended" },
             { value: "provisioning", label: "Provisioning" },
+            { value: "inactive", label: "Inactive" },
           ]}
         />
         <FilterSelect
@@ -120,7 +121,7 @@ export default function TenantsPage() {
         emptyTitle="No tenants match these filters"
         rowActions={(t) => (
           <div className="flex justify-end gap-1">
-            <CanPlatform permission="platform.tenant.impersonate">
+            <CanPlatform permission="platform.tenant.access">
               <Button variant="secondary" size="sm" icon="external" onClick={() => view(t)}>
                 View tenant
               </Button>
