@@ -5,6 +5,7 @@ import { Sidebar } from "./Sidebar";
 import { Topbar } from "./Topbar";
 import { GlobalSearch } from "./GlobalSearch";
 import { NotificationPanel } from "./NotificationPanel";
+import { ImpersonationBanner } from "./ImpersonationBanner";
 import { useSession } from "@/components/providers/SessionProvider";
 import { Icon } from "@/components/ui";
 import { cx } from "@/lib/format";
@@ -51,6 +52,7 @@ export function AppShell({ children }: { children: ReactNode }) {
 
   return (
     <div className="min-h-screen bg-bg">
+      <ImpersonationBanner />
       <Topbar
         onToggleSidebar={() => setSidebarOpen((o) => !o)}
         onOpenSearch={() => setSearchOpen(true)}

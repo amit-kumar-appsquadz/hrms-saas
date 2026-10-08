@@ -92,6 +92,14 @@ export default function LoginPage() {
           <code className="font-mono">mfa</code> to see the MFA step (code{" "}
           <code className="font-mono">{DEMO_MFA_CODE}</code>).
         </div>
+
+        <div className="mt-4 border-t border-border pt-4 text-center">
+          <Link href="/platform/login" className="inline-flex items-center gap-1.5 text-body-sm font-medium text-primary hover:underline">
+            <Icon name="building" size={16} />
+            Platform operator sign in
+          </Link>
+          <p className="mt-1 text-caption text-text-muted">SaaS operators / Super Admins manage all tenants here.</p>
+        </div>
       </CardBody>
     </Card>
   );
