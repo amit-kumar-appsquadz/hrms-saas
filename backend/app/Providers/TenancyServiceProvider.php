@@ -1,0 +1,45 @@
+<?php
+
+namespace App\Providers;
+
+use App\Http\Middleware\ResolveTenant;
+use App\Tenancy\TenantConnectionResolver;
+use App\Tenancy\TenantContext;
+use App\Tenancy\TenantResolver;
+use Illuminate\Routing\Router;
+use Illuminate\Support\ServiceProvider;
+
+/**
+ * TenancyServiceProvider (B1-05)
+ * ------------------------------
+ * Wires the host/tenant resolution seam:
+ *   - binds {@see TenantContext} as a request-scoped singleton (the single place
+ *     the resolved tenant lives — read by the global scope in B1-06 and the
+ *     tenant guard in B1-07);
+ *   - binds the lookup and connection seams as singletons;
+ *   - registers the `resolve.tenant` route-middleware alias so routes/groups can
+ *     opt into resolution, and `resolve.tenant:required` can FAIL CLOSED.
+ *
+ * The provider does NOT force-attach the middleware to the global `tenant`
+ * group — that wiring belongs with the tenant auth guard (B1-07), which composes
+ * resolution + audience + context. B1-05 provides the mechanism and alias; it is
+ * exercised directly by the B1-05 tests via the alias.
+ */
+class TenancyServiceProvider extends ServiceProvider
+{
+    public function register(): void
+    {
+        // One TenantContext per request lifecycle. Under Octane the container is
+        // reset between requests; ResolveTenant also calls reset() defensively.
+        $this->app->singleton(TenantContext::class);
+        $this->app->singleton(TenantResolver::class);
+        $this->app->singleton(TenantConnectionResolver::class);
+    }
+
+    public function boot(Router $router): void
+    {
+        // Route-middleware alias. `resolve.tenant` resolves (tolerant);
+        // `resolve.tenant:required` fails closed when no tenant is resolvable.
+        $router->aliasMiddleware('resolve.tenant', ResolveTenant::class);
+    }
+}
