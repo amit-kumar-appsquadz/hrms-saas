@@ -3,6 +3,7 @@
 namespace App\Providers;
 
 use App\Http\Middleware\ResolveTenant;
+use App\Tenancy\TenantCacheKey;
 use App\Tenancy\TenantConnectionResolver;
 use App\Tenancy\TenantContext;
 use App\Tenancy\TenantResolver;
@@ -34,6 +35,10 @@ class TenancyServiceProvider extends ServiceProvider
         $this->app->singleton(TenantContext::class);
         $this->app->singleton(TenantResolver::class);
         $this->app->singleton(TenantConnectionResolver::class);
+
+        // Tenant-prefixed cache-key helper (B1-06). Depends on TenantContext;
+        // bound here so `t:{tenant_id}:` prefixing is available app-wide.
+        $this->app->singleton(TenantCacheKey::class);
     }
 
     public function boot(Router $router): void
