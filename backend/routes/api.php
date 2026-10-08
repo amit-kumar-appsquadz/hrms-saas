@@ -29,8 +29,21 @@ Route::get('/health', function (Request $request) {
     ]);
 })->name('tenant.health');
 
-// Deny-by-default placeholder group. Real tenant-plane endpoints are added by
-// later B1/B2/B3 tasks behind the `tenant` guard.
+// Tenant-plane group: host/tenant resolution (fail-closed) + tenant-audience
+// auth gate (B1-05 + B1-07). Any route here requires a resolvable tenant AND a
+// valid `tenant`-audience token for that tenant.
 Route::middleware('tenant')->group(function () {
-    // No tenant-plane business routes in B1-00 (foundations only).
+    // Minimal authenticated probe used by the B1-07 feature tests to exercise
+    // the gate end-to-end (audience accept/reject, platform-token rejection,
+    // cross-tenant rejection). No business logic — real tenant endpoints land
+    // in B2/B3.
+    Route::get('/_probe', function (Request $request) {
+        $user = \Illuminate\Support\Facades\Auth::guard('tenant')->user();
+
+        return response()->json([
+            'plane' => 'tenant',
+            'tenant_id' => app(\App\Tenancy\TenantContext::class)->tenantId(),
+            'user_id' => $user?->getAuthIdentifier(),
+        ]);
+    })->name('tenant.probe');
 });
