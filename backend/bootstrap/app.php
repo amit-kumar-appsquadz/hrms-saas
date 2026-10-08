@@ -1,6 +1,8 @@
 <?php
 
 use App\Http\Middleware\DenyByDefault;
+use App\Http\Middleware\Platform\AuthorizePlatform;
+use App\Http\Middleware\Platform\EnsurePlatformAudience;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
@@ -25,22 +27,29 @@ return Application::configure(basePath: dirname(__DIR__))
         },
     )
     ->withMiddleware(function (Middleware $middleware) {
-        // Two plane middleware groups, both DENY-BY-DEFAULT in B1-00.
+        // Two plane middleware groups.
         //
-        // These are the empty placeholder groups referenced by the B1 plan. The
-        // real guards replace the DenyByDefault placeholder here:
-        //   - `platform` group  -> B1-03 (platform audience + identity + authorizer)
-        //   - `tenant`   group  -> B1-05/B1-07 (host/tenant context + tenant audience)
+        //   - `tenant`   group  -> still DENY-BY-DEFAULT (real guard: B1-05/B1-07).
+        //   - `platform` group  -> B1-03: real platform-audience guard replaces the
+        //                          DenyByDefault placeholder.
         //
-        // They must FAIL CLOSED: any route placed in a plane group is rejected until
-        // its guard lands. The only intentionally-open routes are the plane health
-        // checks, which are registered OUTSIDE these groups.
+        // Both FAIL CLOSED: a request not provably authorized for the plane is
+        // rejected. The only intentionally-open routes are the plane health checks,
+        // registered OUTSIDE these groups.
         $middleware->group('tenant', [
             DenyByDefault::class,
         ]);
 
+        // Platform plane (ADR-007 §1, §3). Authenticate via the `platform` guard,
+        // which rejects any non-`platform`-audience token and resolves ONLY against
+        // the platform_users identity store. Per-endpoint `platform.*` authorization
+        // is applied with the `platform.authorize:<permission>` alias below.
         $middleware->group('platform', [
-            DenyByDefault::class,
+            EnsurePlatformAudience::class,
+        ]);
+
+        $middleware->alias([
+            'platform.authorize' => AuthorizePlatform::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions) {

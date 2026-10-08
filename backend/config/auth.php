@@ -40,6 +40,15 @@ return [
             'driver' => 'session',
             'provider' => 'users',
         ],
+
+        // PLATFORM plane guard (ADR-007 §1, §3 / B1-03). A custom bearer-token
+        // guard that authenticates ONLY platform_users and rejects any token
+        // whose audience is not `platform`. The driver is registered in
+        // App\Providers\PlatformAuthServiceProvider via Auth::extend('platform').
+        'platform' => [
+            'driver' => 'platform',
+            'provider' => 'platform_users',
+        ],
     ],
 
     /*
@@ -63,6 +72,14 @@ return [
         'users' => [
             'driver' => 'eloquent',
             'model' => env('AUTH_MODEL', App\Models\User::class),
+        ],
+
+        // PLATFORM identity store (B1-02). Deliberately a SEPARATE provider +
+        // model (platform_users) from the tenant `users` provider — there is no
+        // shared/universal user table (ADR-007 §1, §8).
+        'platform_users' => [
+            'driver' => 'eloquent',
+            'model' => App\Models\Platform\PlatformUser::class,
         ],
 
         // 'users' => [
