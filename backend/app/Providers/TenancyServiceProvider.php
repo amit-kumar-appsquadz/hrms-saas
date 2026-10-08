@@ -3,12 +3,19 @@
 namespace App\Providers;
 
 use App\Http\Middleware\ResolveTenant;
+use App\Tenancy\Audit\AuditCollection;
+use App\Tenancy\Audit\AuditLogStore;
+use App\Tenancy\Audit\InMemoryAuditCollection;
+use App\Tenancy\Audit\MongoAuditLogStore;
+use App\Tenancy\Audit\MongoDBAuditCollection;
 use App\Tenancy\TenantCacheKey;
 use App\Tenancy\TenantConnectionResolver;
 use App\Tenancy\TenantContext;
 use App\Tenancy\TenantResolver;
 use Illuminate\Routing\Router;
 use Illuminate\Support\ServiceProvider;
+use MongoDB\Client;
+use RuntimeException;
 
 /**
  * TenancyServiceProvider (B1-05)
@@ -39,6 +46,56 @@ class TenancyServiceProvider extends ServiceProvider
         // Tenant-prefixed cache-key helper (B1-06). Depends on TenantContext;
         // bound here so `t:{tenant_id}:` prefixing is available app-wide.
         $this->app->singleton(TenantCacheKey::class);
+
+        // --- B1-11 tenant audit store (SEPARATE from platform B1-09) ---------
+        //
+        // The tenant-plane audit store (B1-11) is the append-only sink for
+        // tenant `audit_logs` (ADR-007 §7 separate collection; ADR-003 "behind
+        // an interface"). It mirrors the platform-side wiring (B1-09) but writes
+        // to a SEPARATE collection and stamps/filters by the resolved tenant_id.
+        //
+        // Driver-selected binding (same pattern as B1-09):
+        //   - 'mongodb' (prod / local docker): the real MongoDB adapter, wired
+        //     from config/audit.php (URI + database from env/Secrets Manager).
+        //   - 'fake' (tests, and until the Mongo driver is installed): an
+        //     in-memory collection so tests make NO cloud calls (steering).
+        $this->app->singleton(AuditCollection::class, function (): AuditCollection {
+            $driver = (string) config('audit.tenant.driver', 'fake');
+            $collectionName = (string) config('audit.tenant.collection', MongoAuditLogStore::COLLECTION);
+
+            if ($driver === 'mongodb') {
+                $uri = config('audit.tenant.mongo.uri');
+                $database = (string) config('audit.tenant.mongo.database');
+
+                if (! is_string($uri) || $uri === '') {
+                    throw new RuntimeException(
+                        'Tenant audit driver is "mongodb" but MONGODB_URI is not configured. '
+                        .'Provide the Atlas connection (via Secrets Manager/env); never commit it (ADR-003).'
+                    );
+                }
+
+                // Requires the mongodb PHP extension + mongodb/mongodb driver.
+                // A human provisions Atlas/PrivateLink and installs the driver
+                // (steering rule 6); not exercised by the test suite. The
+                // MongoDB\Client import resolves lazily — only when this branch
+                // runs (driver=mongodb), so the file loads fine without the
+                // driver present (same pattern as B1-09's AppServiceProvider).
+                $client = new Client($uri);
+                $mongoCollection = $client->selectCollection($database, $collectionName);
+
+                return new MongoDBAuditCollection($mongoCollection, $collectionName);
+            }
+
+            // Default: in-memory fake (append-only, same contract). No Mongo.
+            return new InMemoryAuditCollection($collectionName);
+        });
+
+        $this->app->singleton(AuditLogStore::class, function ($app): AuditLogStore {
+            return new MongoAuditLogStore(
+                $app->make(AuditCollection::class),
+                $app->make(TenantContext::class),
+            );
+        });
     }
 
     public function boot(Router $router): void
