@@ -40,8 +40,9 @@ jobs:
         with:
           fetch-depth: 0 # full history so gitleaks can scan the whole diff
       - name: gitleaks
-        uses: gitleaks/gitleaks-action@v2
+        uses: gitleaks/gitleaks-action@v3
         env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITLEAKS_CONFIG: .gitleaks.toml
           # redact so a matched secret value never appears in CI logs.
           GITLEAKS_ENABLE_UPLOAD_ARTIFACT: "false"
