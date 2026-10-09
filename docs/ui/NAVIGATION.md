@@ -116,22 +116,27 @@ Platform (Super Admin only — SEPARATE CONSOLE, not a tenant role)
   └─ Plans & settings     (subscription plans, onboarding defaults, system settings)
 ```
 
-## Platform vs tenant separation (IMPLEMENTED)
+## Platform vs tenant separation (IMPLEMENTED; reconciled round 2)
 The Super Admin / platform-operator experience is a **separate console**, not an entry in the tenant
 role catalog. It lives in its own route group (`(platform)`) with its own session provider, shell
-(visually distinct dark chrome), navigation and permission namespace (`platform.*`). It operates
-outside the tenant subdomain model (ADR-001). The two permission worlds never mix: a platform
-operator holds no tenant permissions and a tenant role holds no `platform.*` permissions.
+(visually distinct dark chrome), navigation and permission namespace (`platform.*`). It runs on the
+**same base domain** (`app.example.com/platform/*` — no admin host; ADR-007 decision 2) with a
+**separate login** (`/platform/login` vs tenant `/login`). The security boundary is server-side
+(token audience + `platform.*` namespace + separate identity store), not the URL/host (ADR-007 §1).
+The two permission worlds never mix: a platform operator holds no tenant permissions and a tenant
+role holds no `platform.*` permissions.
 
 Entry flow:
 ```
-Super Admin → Platform console → Tenant management → "View tenant"
-  → enters the existing tenant application (Tenant Admin / HR Admin / Manager / Employee experience)
-  → an impersonation banner offers "Exit to platform"
+Platform operator → app.example.com/platform/login → Platform console → Tenant management
+  → "Access tenant (read-only)"  [POST /platform/tenants/{id}/access-sessions, reason required]
+  → enters the tenant application READ-ONLY, ≤15-min TTL
+  → persistent "Platform/support access — read only" banner offers "Exit to platform"
 ```
-"View tenant" is a demo-labelled affordance; in production it is an audited, consent-gated,
-time-boxed support session (see API_GAPS § Platform console). The existing tenant demo roles are
-unchanged.
+Phase 1 platform→tenant access is **read-only, reason-required, 15-min, fully audited**
+(`platform_audit_logs` + tenant audit). Write/full impersonation is deferred. The FE demo's current
+"View tenant" impersonation is **ahead of the contract** and must be reconciled to this read-only
+access session (API_GAPS § FE demo ahead of contract).
 
 
 ## Role → section visibility (default)

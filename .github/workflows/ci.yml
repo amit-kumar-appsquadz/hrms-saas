@@ -1,0 +1,120 @@
+# B1-08 — Continuous Integration
+#
+# Runs on every PR and on pushes to integration/main branches. Jobs:
+#   secret-scan   : gitleaks over the full history/diff (steering rule 4)
+#   contract-drift: openapi.yaml -> hand-mirror drift check + admin-host guard
+#   backend       : composer install, Pint lint, `php artisan test` (sqlite :memory:)
+#   frontend      : npm ci, lint, typecheck, vitest, next build
+#
+# NO cloud calls: backend tests use sqlite :memory: (backend/phpunit.xml); the
+# frontend builds in demo mode. No AWS, no live DB. Nothing here needs real
+# secrets; the only credentials in the repo are weak dev-only placeholders that
+# gitleaks is configured to allow.
+#
+# This file is the `ci` status check referenced by branch protection
+# (GIT_WORKFLOW.md Part 3, Sprint 1).
+
+name: ci
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+      - "sprint/**"
+
+# Least privilege: CI only needs to read the repo.
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  secret-scan:
+    name: Secret scan (gitleaks)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # full history so gitleaks can scan the whole diff
+      - name: gitleaks
+        uses: gitleaks/gitleaks-action@v3
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITLEAKS_CONFIG: .gitleaks.toml
+          # redact so a matched secret value never appears in CI logs.
+          GITLEAKS_ENABLE_UPLOAD_ARTIFACT: "false"
+        # No GITLEAKS_LICENSE: the action is free for public repos; for private
+        # repos set the GITLEAKS_LICENSE secret in repo settings (human gate).
+
+  contract-drift:
+    name: OpenAPI drift check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: OpenAPI -> types drift check (fails on divergence)
+        run: node .github/scripts/openapi-drift-check.mjs
+
+  backend:
+    name: Backend (lint + tests)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: "8.2"
+          extensions: mbstring, pdo_sqlite, sqlite3, bcmath, intl
+          coverage: none
+          tools: composer:v2
+      - name: Install dependencies
+        run: composer install --no-interaction --no-progress --prefer-dist
+      - name: Prepare test env
+        run: |
+          cp .env.example .env
+          php artisan key:generate --ansi
+      - name: Lint (Pint) — report-only until B1-00 skeleton is pint-clean
+        # Style signal, NON-BLOCKING for now. The B1-00 skeleton currently has 5
+        # pre-existing Pint findings in Backend-owned files (app/Http/Kernel.php,
+        # bootstrap/providers.php, config/auth.php, database/factories/UserFactory.php,
+        # tests/Feature/PlaneSkeletonTest.php). Those are not DevOps-owned files, so
+        # B1-08 does not fix them; it surfaces them without failing the gate.
+        # TODO(B1 follow-up): once Backend runs `vendor/bin/pint` to clean the
+        # skeleton, drop `continue-on-error` so lint becomes a hard gate.
+        # See docs/infra/B1-08.md "Known issue: Pint on the B1-00 skeleton".
+        continue-on-error: true
+        run: ./vendor/bin/pint --test
+      - name: Tests (php artisan test — sqlite :memory:, no cloud)
+        run: php artisan test
+
+  frontend:
+    name: Frontend (lint + typecheck + test + build)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Install dependencies
+        run: npm ci
+      - name: Lint
+        run: npm run lint
+      - name: Typecheck
+        run: npm run typecheck
+      - name: Unit tests (vitest)
+        run: npm test
+      - name: Build (demo mode, no cloud)
+        run: npm run build

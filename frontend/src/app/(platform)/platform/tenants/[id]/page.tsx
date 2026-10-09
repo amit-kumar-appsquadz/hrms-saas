@@ -66,14 +66,18 @@ export default function TenantDetailPage({ params }: { params: Promise<{ id: str
       <PageHeader
         title={t.name}
         subtitle={t.subdomain}
-        status={t.status === "provisioning" ? "in_progress" : t.status}
+        status={t.status}
         breadcrumbs={[{ label: "Tenants", href: "/platform/tenants" }, { label: t.name }]}
         actions={
           <div className="flex flex-wrap gap-2">
-            <CanPlatform permission="platform.tenant.impersonate">
+            <CanPlatform permission="platform.tenant.access">
               <Button variant="secondary" icon="external" onClick={() => view(t)}>View tenant</Button>
             </CanPlatform>
-            {t.status === "suspended" || t.status === "trial" ? (
+            {/* Lifecycle actions follow the ADR-008 state machine. `inactive` is
+                terminal (no transition back to live), so it exposes no action. */}
+            {t.status === "inactive" ? (
+              <Pill tone="neutral">Offboarded — terminal</Pill>
+            ) : t.status === "suspended" || t.status === "trial" || t.status === "provisioning" ? (
               <CanPlatform permission="platform.tenant.activate">
                 <Button variant="primary" icon="check" onClick={() => toast(`${t.name} activated (demo).`)}>Activate</Button>
               </CanPlatform>
@@ -101,7 +105,7 @@ export default function TenantDetailPage({ params }: { params: Promise<{ id: str
             <dl className="grid grid-cols-1 gap-x-8 gap-y-5 sm:grid-cols-2 lg:grid-cols-3">
               <Field label="Tenant name" value={t.name} />
               <Field label="Subdomain" value={<span className="font-mono">{t.subdomain}</span>} />
-              <Field label="Status" value={<StatusBadge status={t.status === "provisioning" ? "in_progress" : t.status} />} />
+              <Field label="Status" value={<StatusBadge status={t.status} />} />
               <Field label="Plan" value={<Pill tone="info">{t.plan}</Pill>} />
               <Field label="Region" value={t.region} />
               <Field label="Created" value={formatDate(t.created_at)} />

@@ -1,0 +1,35 @@
+# B1-08 — gitleaks configuration (secret scanning, steering rule 4).
+#
+# Extends the gitleaks default ruleset (AWS keys, private keys, generic tokens,
+# etc.) and adds an allowlist so the committed DEV-ONLY compose credentials do
+# not produce false positives. Nothing real is ever allowlisted — only the known
+# weak local-dev placeholders defined in .env.docker.example and docker-compose.yml.
+
+title = "HRMS gitleaks config"
+
+[extend]
+# Pull in gitleaks' built-in rules (do not replace them).
+useDefault = true
+
+[allowlist]
+description = "Dev-only, non-secret local placeholders (never used anywhere real)."
+
+# Files that intentionally contain weak, committed, dev-only credentials.
+paths = [
+  '''\.env\.docker\.example$''',
+  '''docker-compose\.yml$''',
+  '''docker-compose\.ya?ml$''',
+  '''docker/minio/create-bucket\.sh$''',
+  '''docker/mysql/init\.sql$''',
+  '''\.github/openapi-contract\.lock\.json$''',
+]
+
+# Explicit dev-only strings. These are the ONLY values permitted; any other
+# secret-shaped string will still trip the scan.
+regexes = [
+  '''hrms_local_dev_only''',
+  '''root_local_dev_only''',
+  '''mongo_local_dev_only''',
+  '''minio_local_dev_only''',
+  '''hrms_minio_dev''',
+]

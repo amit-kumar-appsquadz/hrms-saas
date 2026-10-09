@@ -5,11 +5,12 @@ import { listPlatformUsers } from "@/services/platform";
 import { StatusBadge, Pill, Button, EmployeeCell, type Column } from "@/components/ui";
 import { CanPlatform } from "@/components/providers/PlatformSessionProvider";
 import { formatDateTime } from "@/lib/format";
+import { roleLabel } from "@/lib/platformRoles";
 import type { PlatformUser } from "@/types/platform";
 
 const columns: Column<PlatformUser>[] = [
   { key: "name", header: "User", render: (u) => <EmployeeCell name={u.name} subtitle={u.email} /> },
-  { key: "role", header: "Platform role", render: (u) => <Pill tone="info">{u.platform_role}</Pill> },
+  { key: "role", header: "Platform role", render: (u) => <Pill tone="info">{roleLabel(u.platform_role)}</Pill> },
   { key: "mfa", header: "MFA", render: (u) => <Pill tone={u.mfa ? "success" : "danger"}>{u.mfa ? "Enabled" : "Off"}</Pill> },
   { key: "last", header: "Last login", render: (u) => (u.last_login ? formatDateTime(u.last_login) : "Never"), secondary: true },
   { key: "status", header: "Status", render: (u) => <StatusBadge status={u.status} /> },

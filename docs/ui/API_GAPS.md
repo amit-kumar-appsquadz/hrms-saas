@@ -1,16 +1,19 @@
 # API Gaps — HRMS SaaS UI
 
-Status: For review (planner). APIs the product UI requires that are **not yet in `openapi.yaml`**. Per steering rule 1, the Frontend agent consumes the contract and never invents endpoints. These gaps must be added to `openapi.yaml` by the planner **before** the matching sprint. This file is the backlog of contract work; it does **not** modify `openapi.yaml` (no missing API is being implemented here, only documented).
+Status: For review (planner). APIs the product UI requires that are **not yet in `openapi.yaml`**. Per steering rule 1, the Frontend agent consumes the contract and never invents endpoints. These gaps must be added to `openapi.yaml` by the planner **before** the matching sprint.
 
-Conventions for all new endpoints (inherit from the Sprint 0 contract): tenant-agnostic paths (tenant from subdomain), `PaginatedEnvelope` on every list, `Error`/`ValidationErrorBody` shapes, bearer auth, sensitive fields `writeOnly`/masked (ADR-006), `page/per_page/q` + typed filters on lists.
+> **Contract-review update (v0.1.0-contract-review):** the **platform plane** (auth, tenant lifecycle, onboarding, platform users, platform audit, plans, settings — ADR-007/008) and **tenant auth-completion** (password forgot/reset, activate, MFA setup/confirm) have been **promoted into `openapi.yaml`** and are no longer gaps. See the "Promoted" markers below and `docs/ui/PLATFORM_API_SPEC.md` / `docs/ui/TENANT_ONBOARDING_SPEC.md`. Classification per brief §2: **A** = add to OpenAPI now, **B** = future gap, **C** = already in contract, **D** = needs architectural decision.
 
-Currently in contract: `/auth/*`, `/roles`, `/roles/{id}`, `/employees`, `/employees/{id}`.
+Each remaining gap below carries: endpoint · purpose · priority · dependency · implementation sprint · frontend consumer · backend consumer · compliance/security-review needed.
+
+Conventions for all new endpoints: tenant-agnostic paths (tenant from subdomain), `PaginatedEnvelope` on every list, `Error`/`ValidationErrorBody` shapes, bearer auth, sensitive fields `writeOnly`/masked (ADR-006), `page/per_page/q` + typed filters on lists.
+
+Currently in contract: `/auth/*` (incl. password/activate/mfa setup), `/roles`, `/employees`, and the full `/platform/*` surface.
 
 ## Sprint 2 — Auth/RBAC completion
-- `POST /auth/password/forgot`, `POST /auth/password/reset`
-- `POST /auth/activate` (invited user set-password)
-- `POST /auth/mfa/setup`, `POST /auth/mfa/confirm`, `POST /auth/mfa/disable`, recovery-code regen
-- `GET /permissions` (platform permission catalog for the matrix)
+- ✅ **Promoted (Class A, in contract):** `POST /auth/password/forgot`, `POST /auth/password/reset`, `POST /auth/activate`, `POST /auth/mfa/setup`, `POST /auth/mfa/confirm`.
+- `POST /auth/mfa/disable`, recovery-code regen — Class A, B2, FE personal-settings, BE auth, security review yes.
+- `GET /permissions` (permission catalog for the matrix) — Class A, B3.
 - `GET /roles/{id}/users`, `POST/DELETE /roles/{id}/users` (assignment)
 - User mgmt: `GET/POST /users`, `GET/PUT /users/{id}`, `POST /users/invite`, `POST /users/{id}/activate|deactivate`, `POST /users/{id}/reset-password`, `GET/DELETE /users/{id}/sessions`, `GET /users/{id}/login-history`
 - `GET /users/{id}/effective-permissions`
@@ -66,18 +69,26 @@ Currently in contract: `/auth/*`, `/roles`, `/roles/{id}`, `/employees`, `/emplo
 - Generic `GET /jobs/{id}` for all queued-job status (import/export/bulk/payroll/report)
 
 ## Platform console (Super Admin — cross-tenant SaaS operator)
-These are **platform-level** endpoints, operating OUTSIDE the tenant subdomain model (ADR-001). They are served by a separate platform API surface and a platform-scoped auth/permission namespace (`platform.*`) that is **distinct from tenant `/auth/me`** — a platform operator is never a tenant role and vice versa. The frontend demo implements this console against the demo layer (`src/lib/demo/platform.ts`); these endpoints must be added by the planner before any live platform build.
+These are **platform-level** endpoints operating OUTSIDE the tenant subdomain model (ADR-007), under `/platform/*` with the `platformAuth` scheme and the `platform.*` namespace — distinct from tenant `/auth/me`. Same base domain (no admin hostname — ADR-007 decision 2). Full spec: `docs/ui/PLATFORM_API_SPEC.md`; routing: `docs/ui/ROUTING_AND_SESSIONS.md`.
 
-- **Platform auth:** `POST /platform/auth/login`, `POST /platform/auth/mfa/verify`, `GET /platform/auth/me` (platform identity + `platform.*` permissions), `POST /platform/auth/logout`. Separate token/session from tenant Sanctum.
-- **Platform dashboard:** `GET /platform/summary` — tenant counts (total/active/trial/suspended), total employees across tenants, MRR, tenant-growth trend, usage-by-plan, status split, system health, recent platform activity, security alerts.
-- **Tenant management:** `GET /platform/tenants` (paginated; filters `status`, `plan`, `q`), `GET /platform/tenants/{id}`, `POST /platform/tenants` (provision), `PUT /platform/tenants/{id}`, `POST /platform/tenants/{id}/activate`, `POST /platform/tenants/{id}/suspend`. Returns subdomain, status, plan, employees, companies, MRR, usage (storage/API calls), region, health.
-- **Tenant onboarding:** `POST /platform/onboarding` (customer info, subdomain availability check, plan, initial tenant-admin invite), `GET /platform/onboarding` (in-flight), stage/progress tracking → triggers provisioning + tenant-admin activation (`/auth/activate`).
-- **Platform users:** `GET/POST /platform/users`, `PUT /platform/users/{id}`, invite/deactivate, MFA status. Platform roles catalog: Super Admin, Platform Operator, Support Engineer, Billing Admin.
-- **Platform audit:** `GET /platform/audit` (paginated; filter by category: tenant_lifecycle, platform_config, security, billing, access) — tenant creation/activation/suspension, platform config changes, impersonation sessions, platform-user access; actor, timestamp, IP/device.
-- **Plans & settings:** `GET/PUT /platform/plans`, `GET/PUT /platform/settings` (onboarding defaults, default region, platform session/MFA policy, support identity).
-- **Tenant impersonation ("View tenant"):** `POST /platform/tenants/{id}/impersonate` → a scoped, time-boxed, **audited, consent-gated** session into the tenant workspace for support. In the demo this is a labelled client-side affordance only; production must enforce authorization, audit every session (ADR-003), and never silently grant platform permissions inside the tenant (or vice versa).
+- ✅ **Promoted (Class A, in contract):** platform auth (`/platform/auth/login|mfa/verify|logout|me`), dashboard (`/platform/summary`), tenant management (`GET/POST /platform/tenants`, `GET/PUT /platform/tenants/{id}`, `.../admin`, `.../activate`, `.../suspend`, `.../reactivate`), **read-only access sessions** (`POST /platform/tenants/{id}/access-sessions`, `DELETE .../access-sessions/{sid}`), onboarding (`GET/POST /platform/onboarding`), platform users (`GET/POST /platform/users`), platform audit (`GET /platform/audit`), plans (`GET /platform/plans`), settings (`GET/PUT /platform/settings`). Backend B1–B3; FE platform console (built); **security review mandatory** (plane separation, token audience, MFA, read-only access-session enforcement).
+
+- **Class D — deferred to a future decision (NOT in contract):**
+  - **Write / full impersonation + delegated tenant actions** — explicitly deferred (ADR-007 §6). Phase 1 exposes only the **read-only** access session. Revisit post-pilot with a dedicated security review.
+  - **Live billing integration** — subscription/invoice sync with a payment provider. Phase 1 is record-keeping only (`Subscription.billing_metadata` is the seam). No payment APIs invented.
+  - **Configurable platform RBAC tables** — Phase 1 uses the fixed role enum; `PlatformAuthorizer` is the documented extension seam.
+
+- **Policy (not an endpoint):** `inactive` tenant **retention period** needs legal/compliance sign-off (`platform_settings.inactive_retention_days`; NULL = no auto-purge). Non-blocking.
+
+## Frontend demo intentionally ahead of the backend contract
+Reconcile at live-switch (none of these are contract-backed yet beyond what is noted):
+- **"View tenant" impersonation (FE-DEMO-02):** the demo sets a tenant session + banner with no reason/TTL/read-only enforcement. The contract replaces this with the **read-only access session** (`access-sessions`, mandatory reason, ≤15-min TTL, read-only, persistent banner). FE must call the new endpoint and drop the client-only impersonation shortcut.
+- **Platform role labels:** demo uses Super Admin / Platform Operator / Support Engineer / Billing Admin; contract uses the fixed enum `PLATFORM_SUPER_ADMIN/SUPPORT/OPERATIONS/AUDITOR`. Map at live-switch.
+- **Tenant status `inactive`:** demo lacks it; FE must add filter + badge + "offboarded" copy.
+- **Demo auth/session (localStorage keys):** replaced by real `platformAuth`/`tenantAuth` tokens with audience checks.
 
 ## Notes
 - Each gap must land in `openapi.yaml` **before** its sprint's frontend task starts, with schemas reconciled against `docs/data-model.md`. Contract changes go through the planner (steering rule 1).
 - Sensitive endpoints (`reveal`, compensation, payslips, audit-with-sensitive) must specify masking + the required permission + that access is audited (ADR-006).
 - Money/statutory endpoints are `needs-expert` (steering rule 5); the UI only consumes their outputs.
+- **FE alignment:** the demo uses tenant status `active|trial|suspended|provisioning`; the backend adopts the full ADR-008 set which adds `inactive` (offboarded). The frontend must add `inactive` handling (filter, badge, copy) when switching the platform console off demo mode.

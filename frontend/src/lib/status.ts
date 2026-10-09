@@ -33,6 +33,12 @@ const MAP: Record<string, { tone: StatusTone; label: string }> = {
   // Users
   invited: { tone: "info", label: "Invited" },
   disabled: { tone: "neutral", label: "Disabled" },
+  // Tenant lifecycle (ADR-008): provisioning→trial→active→suspended→inactive.
+  // `active` and `inactive` are defined above (Employee section) with the same
+  // intended tone/label and are reused here. `inactive` = terminal/churned.
+  trial: { tone: "info", label: "Trial" },
+  suspended: { tone: "danger", label: "Suspended" },
+  provisioning: { tone: "warning", label: "Provisioning" },
   // Compliance
   compliant: { tone: "success", label: "Compliant" },
   action_required: { tone: "danger", label: "Action required" },

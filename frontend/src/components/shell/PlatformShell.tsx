@@ -4,7 +4,7 @@ import { useEffect, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { usePlatformSession, platformRoles } from "@/components/providers/PlatformSessionProvider";
-import type { PlatformRoleSlug } from "@/services/platformAuth";
+import type { PlatformRole } from "@/lib/platformRoles";
 import { platformNav } from "@/lib/platformNavigation";
 import { Icon, Avatar } from "@/components/ui";
 import { cx } from "@/lib/format";
@@ -89,12 +89,12 @@ export function PlatformShell({ children }: { children: ReactNode }) {
             <span className="hidden lg:inline">View as</span>
             <select
               value={role}
-              onChange={(e) => setRole(e.target.value as PlatformRoleSlug)}
+              onChange={(e) => setRole(e.target.value as PlatformRole)}
               aria-label="Preview as platform role"
               className="bg-transparent text-caption font-medium text-white focus:outline-none [&>option]:text-text"
             >
               {platformRoles.map((r) => (
-                <option key={r.slug} value={r.slug}>
+                <option key={r.role} value={r.role}>
                   {r.name}
                 </option>
               ))}
@@ -103,7 +103,7 @@ export function PlatformShell({ children }: { children: ReactNode }) {
           <div className="flex items-center gap-2">
             <Avatar name={identity.name} size="sm" />
             <div className="hidden text-right sm:block">
-              <div className="text-caption font-medium leading-tight">{identity.platform_role}</div>
+              <div className="text-caption font-medium leading-tight">{identity.platform_role_label}</div>
               <div className="text-[10px] leading-tight text-white/60">{identity.email}</div>
             </div>
           </div>

@@ -1,6 +1,6 @@
 # ADR-001: Tenancy model
 
-Status: Accepted (Sprint 0). Primary customer segment: mid-market.
+Status: Accepted (Sprint 0). Primary customer segment: mid-market. **Amended (contract-review round 2): added "Platform plane and reserved hosts" to reconcile the same-domain platform console (ADR-007 decision 2) with subdomain tenant resolution — the amendment does not change tenant resolution behavior.**
 
 ## Context
 Multi-tenant HRMS SaaS for India. Primary target is mid-market (roughly 200-5,000 employees per tenant), not high-volume SMB self-serve and not single-tenant enterprise installs. This shapes the default to favor strong logical isolation and predictable per-tenant query performance, while leaving room for a dedicated-database option for a few large/regulated enterprise tenants later.
@@ -20,6 +20,17 @@ Multi-tenant HRMS SaaS for India. Primary target is mid-market (roughly 200-5,00
 - Composite-index-with-`tenant_id`-first is required for the p95 < 200 ms target; enforced via N+1/index checks (S3-04).
 - "Noisy neighbor" risk on the shared cluster; mitigated by per-tenant rate limiting (S6-04) and later by moving a heavy tenant to a dedicated DB via the preserved seam.
 - Cross-tenant admin/analytics queries must go through an explicit, audited bypass path, never ad hoc.
+
+## Platform plane and reserved hosts (amendment, contract-review round 2)
+This amendment reconciles ADR-007's **same-domain** platform console with subdomain tenant resolution. **Tenant resolution is unchanged**: a tenant is still resolved exclusively from the subdomain `<tenant>.app.example.com`, with the same global scope and cache rules.
+
+What is added:
+- **Reserved, non-tenant hosts.** The apex/base host (`app.example.com`) and a small reserved label set (`app`, `www`, `platform`, `admin`, `api`, `static`, plus others as needed) are **not** tenant subdomains. The tenant resolver treats these as "no tenant" rather than attempting to resolve a tenant named `app`/`www`/etc. A reserved label can never be allocated as a tenant subdomain (enforced at onboarding, ADR-008).
+- **Platform console lives on the base host, not a separate hostname.** The platform plane is reached at `app.example.com/platform/*` (login at `/platform/login`). There is **no** `admin.app.example.com`. The `/platform/*` path and the base host are routing conveniences only; the security boundary is the platform token audience + `platform.*` namespace + separate identity store (ADR-007 §1), enforced server-side.
+- **Tenant login on the base host.** `app.example.com/login` is permitted as a tenant login entry that does not pre-resolve a tenant from the host; the tenant is established by the authenticated session/selected workspace, after which the user operates under `<tenant>.app.example.com` (or a base-host session carrying the resolved `tenant_id`). This does not weaken isolation: no tenant data is served until a `tenant_id` is resolved and the global scope applies.
+- **A request on the base host never silently falls back to a default tenant.** If a tenant-scoped API is called without a resolvable tenant context, it fails closed (401/400), never defaulting to an arbitrary tenant.
+
+Why this is safe: the discriminator (`tenant_id`) and the global scope are unchanged; we only declare that certain hosts carry no tenant and that the platform plane shares the domain but not the auth/authorization context. The full host/session model is documented in `docs/ui/ROUTING_AND_SESSIONS.md`.
 
 ## Alternatives considered
 - **Database-per-tenant from day one:** strongest isolation, simplest noisy-neighbor story, but high fixed cost and migration/ops overhead per tenant; wrong fit for many mid-market tenants. Deferred to an enterprise option behind the seam.
