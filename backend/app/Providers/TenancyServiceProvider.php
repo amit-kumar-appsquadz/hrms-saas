@@ -2,12 +2,16 @@
 
 namespace App\Providers;
 
+use App\Auth\TenantGuard;
+use App\Http\Middleware\EnsureTenantAudience;
 use App\Http\Middleware\ResolveTenant;
 use App\Tenancy\TenantCacheKey;
 use App\Tenancy\TenantConnectionResolver;
 use App\Tenancy\TenantContext;
 use App\Tenancy\TenantResolver;
+use Illuminate\Contracts\Auth\Guard;
 use Illuminate\Routing\Router;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\ServiceProvider;
 
 /**
@@ -46,5 +50,27 @@ class TenancyServiceProvider extends ServiceProvider
         // Route-middleware alias. `resolve.tenant` resolves (tolerant);
         // `resolve.tenant:required` fails closed when no tenant is resolvable.
         $router->aliasMiddleware('resolve.tenant', ResolveTenant::class);
+
+        // Tenant-audience auth gate (B1-07). Alias so routes/groups can require
+        // a valid tenant-audience token for the resolved tenant.
+        $router->aliasMiddleware('tenant.auth', EnsureTenantAudience::class);
+
+        // Register the custom `tenant` auth guard driver (config/auth.php →
+        // guards.tenant). It builds a TenantGuard bound to the `tenant_users`
+        // provider and the request-scoped TenantContext, so the tenant plane
+        // authenticates ONLY tenant users WITHIN the resolved tenant and enforces
+        // the `tenant` token audience (ADR-007 §1, §3).
+        //
+        // Resolved per-request (not a singleton): it depends on the current
+        // Request's bearer token and the per-request TenantContext.
+        Auth::extend('tenant', function ($app, string $name, array $config): Guard {
+            $provider = Auth::createUserProvider($config['provider'] ?? null);
+
+            return new TenantGuard(
+                $provider,
+                $app['request'],
+                $app->make(TenantContext::class),
+            );
+        });
     }
 }

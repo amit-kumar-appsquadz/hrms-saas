@@ -4,6 +4,7 @@ namespace Tests\Feature\Platform;
 
 use App\Models\Platform\PlatformUser;
 use App\Models\User;
+use App\Models\Tenant;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\QueryException;
@@ -168,7 +169,12 @@ class PlatformUserSchemaTest extends TestCase
         // creating a tenant user does not create a platform identity.
         $email = 'dual@identity.test';
 
-        User::factory()->create(['email' => $email]);
+        $tenant = Tenant::factory()->create();
+
+        User::factory()->create([
+            'tenant_id' => $tenant->id,
+            'email' => $email,
+        ]);
 
         $this->assertDatabaseHas('users', ['email' => $email]);
         $this->assertDatabaseMissing('platform_users', ['email' => $email]);

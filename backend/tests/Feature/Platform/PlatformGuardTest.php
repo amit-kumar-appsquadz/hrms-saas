@@ -6,6 +6,7 @@ use App\Auth\PlatformGuard;
 use App\Auth\TokenAudience;
 use App\Models\Platform\PlatformUser;
 use App\Models\User;
+use App\Models\Tenant;
 use App\Platform\PlatformRole;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Request;
@@ -33,7 +34,7 @@ class PlatformGuardTest extends TestCase
     {
         $request = Request::create('/api/v1/platform/_probe', 'GET');
         if ($token !== null) {
-            $request->headers->set('Authorization', 'Bearer '.$token);
+            $request->headers->set('Authorization', 'Bearer ' . $token);
         }
 
         $provider = Auth::createUserProvider('platform_users');
@@ -68,7 +69,11 @@ class PlatformGuardTest extends TestCase
     public function test_tenant_user_cannot_authenticate_via_the_platform_guard(): void
     {
         // A tenant user in the SEPARATE `users` identity store.
-        $tenantUser = User::factory()->create();
+        $tenant = Tenant::factory()->create();
+
+        $tenantUser = User::factory()->create([
+            'tenant_id' => $tenant->id,
+        ]);
 
         // Ensure no platform_user shares that id (distinct identity stores).
         $this->assertNull(PlatformUser::find($tenantUser->id));

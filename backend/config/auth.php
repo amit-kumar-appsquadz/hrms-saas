@@ -49,6 +49,15 @@ return [
             'driver' => 'platform',
             'provider' => 'platform_users',
         ],
+        // TENANT plane guard (ADR-007 §1, §3 / B1-07). A custom bearer-token
+        // guard that authenticates ONLY tenant users (the tenant-owned `users`
+        // table) WITHIN the resolved tenant context, and rejects any token whose
+        // audience is not `tenant`. The driver is registered in
+        // App\Providers\TenancyServiceProvider via Auth::extend('tenant').
+        'tenant' => [
+            'driver' => 'tenant',
+            'provider' => 'tenant_users',
+        ],
     ],
 
     /*
@@ -80,6 +89,15 @@ return [
         'platform_users' => [
             'driver' => 'eloquent',
             'model' => App\Models\Platform\PlatformUser::class,
+        ],
+        // TENANT identity store (B1-07 stub). A SEPARATE provider + model from
+        // the platform identity store (platform_users, B1-02): there is no
+        // shared/universal user table (ADR-007 §1, §8). The model is tenant-owned
+        // (`users.tenant_id`); the TenantGuard scopes every lookup to the
+        // resolved tenant context.
+        'tenant_users' => [
+            'driver' => 'eloquent',
+            'model' => App\Models\Tenant\TenantUser::class,
         ],
 
         // 'users' => [
