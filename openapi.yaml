@@ -1,0 +1,1739 @@
+openapi: 3.1.0
+info:
+  title: HRMS SaaS API
+  version: 0.1.0-contract-review
+  description: >
+    Contract-first API for the multi-tenant HRMS SaaS (India). openapi.yaml is
+    the single source of truth; backend and frontend both work from it (steering
+    rule 1). Contract changes go through the planner.
+
+    TWO PLANES (ADR-007), SAME BASE DOMAIN (ADR-007 decision 2, ADR-001 amendment):
+    - TENANT PLANE: the tenant is resolved from the request subdomain
+      (<tenant>.app.example.com). URL paths are tenant-agnostic — there is no
+      /tenants/{id} segment. All data is scoped to the resolved tenant
+      server-side (ADR-001). Auth: tenantAuth (Sanctum tenant token, audience
+      "tenant"); MFA mandatory. Tenant login: app.example.com/login and/or the
+      tenant subdomain.
+    - PLATFORM PLANE: the SaaS operator console under /platform/*, reached on the
+      SAME base domain (app.example.com/platform/login) — there is NO separate
+      admin hostname. It has its OWN authentication (platformAuth, audience
+      "platform", MFA mandatory), its OWN permission namespace (platform.*,
+      fixed role enum in Phase 1), and its OWN identity store (platform_users).
+      The security boundary is server-side (token audience + namespace +
+      identity + explicit checks), NOT the URL path or hostname. Platform tokens
+      are rejected by tenant endpoints and vice versa. Cross-tenant operations
+      exist ONLY on this plane and are always audited to platform_audit_logs.
+      Platform-to-tenant support access is READ-ONLY, reason-required, and
+      15-minute-max in Phase 1 (ADR-007 §6).
+
+    This revision reflects contract-review round 2 approved decisions.
+
+servers:
+  - url: https://{tenant}.app.example.com/api/v1
+    description: Tenant plane — per-tenant subdomain (tenantAuth)
+    variables:
+      tenant:
+        default: acme
+  - url: https://app.example.com/api/v1
+    description: >
+      Base domain. Hosts the platform plane (/platform/*, platformAuth) and the
+      tenant login entry (/auth/login) which resolves a tenant from the
+      authenticated session, not the host. Reserved/base host carries no tenant
+      by default (ADR-001 amendment).
+
+security:
+  - tenantAuth: []
+
+tags:
+  - name: Auth
+    description: Tenant-plane authentication (Sanctum, audience "tenant").
+  - name: Roles
+  - name: Employees
+  - name: Platform Auth
+    description: Platform-plane authentication (separate audience "platform", MFA mandatory — ADR-007).
+  - name: Platform Tenants
+    description: Cross-tenant tenant lifecycle management. Platform plane only; every call audited.
+  - name: Platform Onboarding
+  - name: Platform Users
+  - name: Platform Audit
+  - name: Platform Plans & Settings
+
+paths:
+  /auth/login:
+    post:
+      tags: [Auth]
+      summary: Authenticate with email and password
+      description: >
+        Returns a token on success. If MFA is enabled for the user, returns an
+        mfa_required challenge instead of a token; the client then calls
+        /auth/mfa/verify.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '200':
+          description: Authenticated or MFA challenge issued
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LoginResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+
+  /auth/mfa/verify:
+    post:
+      tags: [Auth]
+      summary: Verify a TOTP code to complete login
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MfaVerifyRequest'
+      responses:
+        '200':
+          description: Authenticated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TokenResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+  /auth/refresh:
+    post:
+      tags: [Auth]
+      summary: Refresh the access token
+      responses:
+        '200':
+          description: New token issued
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TokenResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /auth/logout:
+    post:
+      tags: [Auth]
+      summary: Revoke the current token/session
+      responses:
+        '204':
+          description: Logged out
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /auth/me:
+    get:
+      tags: [Auth]
+      summary: Current authenticated user and permissions
+      responses:
+        '200':
+          description: Current user
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CurrentUser'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /auth/password/forgot:
+    post:
+      tags: [Auth]
+      summary: Request a password reset email
+      description: >
+        Always returns 202 regardless of whether the account exists
+        (no user enumeration). Tenant resolved from subdomain.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email]
+              properties:
+                email: { type: string, format: email }
+      responses:
+        '202':
+          description: Reset email dispatched if the account exists.
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+
+  /auth/password/reset:
+    post:
+      tags: [Auth]
+      summary: Reset password using an emailed token
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [token, password]
+              properties:
+                token: { type: string }
+                password: { type: string, format: password }
+      responses:
+        '204':
+          description: Password reset.
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+  /auth/activate:
+    post:
+      tags: [Auth]
+      summary: Activate an invited user (set first password)
+      description: Used by invited tenant users, including the initial Tenant Admin created during onboarding (ADR-008).
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [token, password]
+              properties:
+                token: { type: string }
+                password: { type: string, format: password }
+      responses:
+        '200':
+          description: Activated; token issued.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TokenResponse'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+  /auth/mfa/setup:
+    post:
+      tags: [Auth]
+      summary: Begin TOTP enrolment (returns provisioning secret/QR)
+      responses:
+        '200':
+          description: Enrolment challenge.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  secret: { type: string, description: TOTP secret (shown once). }
+                  otpauth_uri: { type: string, description: For QR rendering. }
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /auth/mfa/confirm:
+    post:
+      tags: [Auth]
+      summary: Confirm TOTP enrolment and receive recovery codes
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [code]
+              properties:
+                code: { type: string, description: 6-digit TOTP code. }
+      responses:
+        '200':
+          description: MFA enabled; recovery codes returned once.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  recovery_codes:
+                    type: array
+                    items: { type: string }
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+  /roles:
+    get:
+      tags: [Roles]
+      summary: List roles
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+      responses:
+        '200':
+          description: Paginated roles
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/PaginatedEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/Role'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+    post:
+      tags: [Roles]
+      summary: Create a role
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RoleWriteRequest'
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Role'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+  /roles/{roleId}:
+    parameters:
+      - $ref: '#/components/parameters/RoleId'
+    get:
+      tags: [Roles]
+      summary: Get a role
+      responses:
+        '200':
+          description: Role
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Role'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    put:
+      tags: [Roles]
+      summary: Update a role
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RoleWriteRequest'
+      responses:
+        '200':
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Role'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+    delete:
+      tags: [Roles]
+      summary: Delete a role
+      responses:
+        '204':
+          description: Deleted
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /employees:
+    get:
+      tags: [Employees]
+      summary: List employees
+      description: Paginated. Sensitive fields (PAN, bank) are masked unless the caller has the relevant permission.
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+        - name: q
+          in: query
+          description: Free-text search over name/code/work email.
+          schema:
+            type: string
+        - name: department_id
+          in: query
+          schema:
+            type: integer
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [active, inactive, on_notice, exited]
+      responses:
+        '200':
+          description: Paginated employees
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/PaginatedEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/EmployeeSummary'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+    post:
+      tags: [Employees]
+      summary: Create an employee
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EmployeeWriteRequest'
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Employee'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+  /employees/{employeeId}:
+    parameters:
+      - $ref: '#/components/parameters/EmployeeId'
+    get:
+      tags: [Employees]
+      summary: Get an employee
+      responses:
+        '200':
+          description: Employee
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Employee'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    put:
+      tags: [Employees]
+      summary: Update an employee
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EmployeeWriteRequest'
+      responses:
+        '200':
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Employee'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+  # ============================================================
+  # PLATFORM PLANE (ADR-007) — operator-only host, platformAuth,
+  # platform.* permissions, cross-tenant, every call audited.
+  # ============================================================
+
+  /platform/auth/login:
+    post:
+      tags: [Platform Auth]
+      summary: Platform operator login
+      description: Separate audience from tenant auth. MFA is mandatory for platform users.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '200':
+          description: Authenticated or MFA challenge (MFA always required for platform).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LoginResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+
+  /platform/auth/mfa/verify:
+    post:
+      tags: [Platform Auth]
+      summary: Verify platform operator TOTP
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MfaVerifyRequest'
+      responses:
+        '200':
+          description: Authenticated (platform token).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TokenResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+  /platform/auth/logout:
+    post:
+      tags: [Platform Auth]
+      summary: Revoke the current platform token
+      security:
+        - platformAuth: []
+      responses:
+        '204':
+          description: Logged out.
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /platform/auth/me:
+    get:
+      tags: [Platform Auth]
+      summary: Current platform operator and platform.* permissions
+      security:
+        - platformAuth: []
+      responses:
+        '200':
+          description: Platform identity. Contains ONLY platform.* permissions (ADR-007).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PlatformCurrentUser'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /platform/summary:
+    get:
+      tags: [Platform Tenants]
+      summary: Platform dashboard summary (cross-tenant aggregates)
+      security:
+        - platformAuth: []
+      responses:
+        '200':
+          description: Aggregate counts/metrics across all tenants.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PlatformSummary'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /platform/tenants:
+    get:
+      tags: [Platform Tenants]
+      summary: List tenants (cross-tenant — platform plane only, audited)
+      security:
+        - platformAuth: []
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+        - name: q
+          in: query
+          schema: { type: string }
+        - name: status
+          in: query
+          schema: { $ref: '#/components/schemas/TenantStatus' }
+        - name: plan
+          in: query
+          schema: { type: string }
+        - name: subdomain
+          in: query
+          description: Exact-match availability/lookup check during onboarding.
+          schema: { type: string }
+        - name: sort
+          in: query
+          schema: { type: string, example: '-created_at' }
+      responses:
+        '200':
+          description: Paginated tenants.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/PaginatedEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items: { $ref: '#/components/schemas/PlatformTenant' }
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+    post:
+      tags: [Platform Tenants]
+      summary: Provision a new tenant (status=provisioning)
+      description: Creates the tenant record and begins provisioning (ADR-008). Audited.
+      security:
+        - platformAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TenantProvisionRequest'
+      responses:
+        '201':
+          description: Created (provisioning).
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PlatformTenant' }
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+  /platform/tenants/{tenantId}:
+    parameters:
+      - $ref: '#/components/parameters/TenantId'
+    get:
+      tags: [Platform Tenants]
+      summary: Get tenant details (incl. subscription/usage)
+      security:
+        - platformAuth: []
+      responses:
+        '200':
+          description: Tenant detail.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PlatformTenantDetail' }
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    put:
+      tags: [Platform Tenants]
+      summary: Configure a tenant (plan, region, defaults)
+      security:
+        - platformAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/TenantConfigureRequest' }
+      responses:
+        '200':
+          description: Updated.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PlatformTenantDetail' }
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+  /platform/tenants/{tenantId}/admin:
+    parameters:
+      - $ref: '#/components/parameters/TenantId'
+    post:
+      tags: [Platform Tenants]
+      summary: Create/invite the initial Tenant Admin for a tenant
+      description: >
+        The single sanctioned cross-plane write (ADR-007 §5, ADR-008): creates a
+        tenant-plane user with the Tenant Admin role and sends an activation
+        invite. Audited on both planes.
+      security:
+        - platformAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [full_name, email]
+              properties:
+                full_name: { type: string }
+                email: { type: string, format: email }
+      responses:
+        '201':
+          description: Tenant Admin invited (status invited).
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+  /platform/tenants/{tenantId}/activate:
+    parameters:
+      - $ref: '#/components/parameters/TenantId'
+    post:
+      tags: [Platform Tenants]
+      summary: Activate a tenant (provisioning → trial|active)
+      description: Validates provisioning complete and an admin exists (ADR-008 guards). Audited.
+      security:
+        - platformAuth: []
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                target_status: { $ref: '#/components/schemas/TenantStatus', description: 'trial or active' }
+      responses:
+        '200':
+          description: Activated.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PlatformTenant' }
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /platform/tenants/{tenantId}/suspend:
+    parameters:
+      - $ref: '#/components/parameters/TenantId'
+    post:
+      tags: [Platform Tenants]
+      summary: Suspend a tenant (reversible disable; blocks tenant login)
+      security:
+        - platformAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [reason]
+              properties:
+                reason: { type: string }
+      responses:
+        '200':
+          description: Suspended.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PlatformTenant' }
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /platform/tenants/{tenantId}/reactivate:
+    parameters:
+      - $ref: '#/components/parameters/TenantId'
+    post:
+      tags: [Platform Tenants]
+      summary: Reactivate a suspended tenant (suspended → active|trial)
+      security:
+        - platformAuth: []
+      responses:
+        '200':
+          description: Reactivated.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PlatformTenant' }
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /platform/tenants/{tenantId}/access-sessions:
+    parameters:
+      - $ref: '#/components/parameters/TenantId'
+    post:
+      tags: [Platform Tenants]
+      summary: Start a READ-ONLY platform support access session into a tenant
+      description: >
+        Phase-1 platform-to-tenant access (ADR-007 §6). READ-ONLY only. Requires
+        an authorized platform user with platform.tenant.access, a mandatory
+        reason, and is fully audited to platform_audit_logs AND the tenant audit
+        trail. Mints a scoped tenant-context token (audience "tenant",
+        platform_access=true, platform_actor claim) with a maximum 15-minute TTL
+        that grants NO tenant writes and NO platform.* inside the tenant. Write
+        impersonation/delegated actions are NOT supported in Phase 1.
+      security:
+        - platformAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [reason]
+              properties:
+                reason:
+                  type: string
+                  description: Mandatory justification; recorded in platform_audit_logs.
+      responses:
+        '201':
+          description: Read-only access session started.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PlatformAccessSession'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+  /platform/tenants/{tenantId}/access-sessions/{sessionId}:
+    parameters:
+      - $ref: '#/components/parameters/TenantId'
+      - name: sessionId
+        in: path
+        required: true
+        schema: { type: string }
+    delete:
+      tags: [Platform Tenants]
+      summary: End a read-only platform access session early
+      security:
+        - platformAuth: []
+      responses:
+        '204':
+          description: Session ended (also expires automatically at TTL).
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /platform/onboarding:
+    get:
+      tags: [Platform Onboarding]
+      summary: List in-flight tenant onboardings
+      security:
+        - platformAuth: []
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+      responses:
+        '200':
+          description: Paginated onboarding records.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/PaginatedEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items: { $ref: '#/components/schemas/TenantOnboarding' }
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+    post:
+      tags: [Platform Onboarding]
+      summary: Orchestrate tenant onboarding (wizard entrypoint)
+      description: >
+        Convenience orchestrator for the 5-step wizard: customer info +
+        subdomain availability + plan + initial-admin invite. Drives
+        POST /platform/tenants, PUT, /admin and /activate (ADR-008). Audited.
+      security:
+        - platformAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/TenantOnboardingRequest' }
+      responses:
+        '201':
+          description: Onboarding started.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/TenantOnboarding' }
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          description: Subdomain already taken.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+  /platform/users:
+    get:
+      tags: [Platform Users]
+      summary: List platform operators
+      security:
+        - platformAuth: []
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+      responses:
+        '200':
+          description: Paginated platform users.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/PaginatedEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items: { $ref: '#/components/schemas/PlatformUser' }
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+    post:
+      tags: [Platform Users]
+      summary: Invite a platform operator
+      security:
+        - platformAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/PlatformUserWriteRequest' }
+      responses:
+        '201':
+          description: Invited.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PlatformUser' }
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+  /platform/audit:
+    get:
+      tags: [Platform Audit]
+      summary: Platform audit log (tenant lifecycle, config, security, billing, access)
+      description: Append-only platform-plane audit (ADR-003/ADR-007). Includes every cross-tenant op and impersonation session.
+      security:
+        - platformAuth: []
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+        - name: category
+          in: query
+          schema:
+            type: string
+            enum: [tenant_lifecycle, platform_config, security, billing, access]
+        - name: actor
+          in: query
+          schema: { type: string }
+        - name: from
+          in: query
+          schema: { type: string, format: date-time }
+        - name: to
+          in: query
+          schema: { type: string, format: date-time }
+      responses:
+        '200':
+          description: Paginated platform audit entries.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/PaginatedEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items: { $ref: '#/components/schemas/PlatformAuditEntry' }
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /platform/plans:
+    get:
+      tags: [Platform Plans & Settings]
+      summary: List subscription plans
+      security:
+        - platformAuth: []
+      responses:
+        '200':
+          description: Plans.
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/PlatformPlan' }
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /platform/settings:
+    get:
+      tags: [Platform Plans & Settings]
+      summary: Get platform settings
+      security:
+        - platformAuth: []
+      responses:
+        '200':
+          description: Platform settings.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PlatformSettings' }
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+    put:
+      tags: [Platform Plans & Settings]
+      summary: Update platform settings
+      security:
+        - platformAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/PlatformSettings' }
+      responses:
+        '200':
+          description: Updated.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PlatformSettings' }
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+components:
+  securitySchemes:
+    tenantAuth:
+      type: http
+      scheme: bearer
+      description: >
+        Laravel Sanctum tenant token (audience "tenant"), bound to the subdomain
+        tenant. Rejected by platform-plane endpoints (ADR-007).
+    platformAuth:
+      type: http
+      scheme: bearer
+      description: >
+        Platform operator token (audience "platform", MFA mandatory). Grants
+        only platform.* permissions (fixed role enum in Phase 1: PLATFORM_SUPER_ADMIN,
+        PLATFORM_SUPPORT, PLATFORM_OPERATIONS, PLATFORM_AUDITOR); carries NO
+        tenant permissions and is rejected by tenant-plane endpoints. The
+        boundary is enforced server-side (audience + namespace + identity),
+        not by the URL path or hostname (ADR-007 §1).
+
+  parameters:
+    Page:
+      name: page
+      in: query
+      description: 1-based page number.
+      schema:
+        type: integer
+        minimum: 1
+        default: 1
+    PerPage:
+      name: per_page
+      in: query
+      description: Items per page (every list is paginated — steering rule 3).
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 25
+    RoleId:
+      name: roleId
+      in: path
+      required: true
+      schema:
+        type: integer
+    EmployeeId:
+      name: employeeId
+      in: path
+      required: true
+      schema:
+        type: integer
+    TenantId:
+      name: tenantId
+      in: path
+      required: true
+      description: Platform-plane tenant surrogate id. Only valid on /platform/* endpoints (ADR-007).
+      schema:
+        type: integer
+
+  responses:
+    Unauthorized:
+      description: Missing or invalid authentication.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    Forbidden:
+      description: Authenticated but lacks permission.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    NotFound:
+      description: Resource not found in this tenant.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    ValidationError:
+      description: Request failed validation.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ValidationErrorBody'
+    RateLimited:
+      description: Too many requests (per-tenant rate limiting — ADR / S6-04).
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    Conflict:
+      description: Illegal state transition or uniqueness conflict (e.g. invalid tenant lifecycle transition, subdomain taken).
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+
+  schemas:
+    Error:
+      type: object
+      description: Consistent error shape for all non-2xx responses.
+      required: [error]
+      properties:
+        error:
+          type: object
+          required: [code, message]
+          properties:
+            code:
+              type: string
+              example: forbidden
+            message:
+              type: string
+              example: You do not have permission to perform this action.
+            request_id:
+              type: string
+              description: Correlation id for support/tracing.
+
+    ValidationErrorBody:
+      allOf:
+        - $ref: '#/components/schemas/Error'
+        - type: object
+          properties:
+            error:
+              type: object
+              properties:
+                fields:
+                  type: object
+                  additionalProperties:
+                    type: array
+                    items:
+                      type: string
+                  example:
+                    work_email: ["The work email has already been taken."]
+
+    PaginatedEnvelope:
+      type: object
+      description: Standard pagination wrapper for every list response.
+      required: [data, meta]
+      properties:
+        data:
+          type: array
+          items: {}
+        meta:
+          type: object
+          required: [page, per_page, total, total_pages]
+          properties:
+            page:
+              type: integer
+            per_page:
+              type: integer
+            total:
+              type: integer
+            total_pages:
+              type: integer
+
+    LoginRequest:
+      type: object
+      required: [email, password]
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+          format: password
+
+    LoginResponse:
+      oneOf:
+        - $ref: '#/components/schemas/TokenResponse'
+        - $ref: '#/components/schemas/MfaChallenge'
+
+    TokenResponse:
+      type: object
+      required: [token, token_type]
+      properties:
+        token:
+          type: string
+        token_type:
+          type: string
+          example: Bearer
+        expires_in:
+          type: integer
+          description: Seconds until expiry.
+
+    MfaChallenge:
+      type: object
+      required: [mfa_required, challenge_id]
+      properties:
+        mfa_required:
+          type: boolean
+          enum: [true]
+        challenge_id:
+          type: string
+
+    MfaVerifyRequest:
+      type: object
+      required: [challenge_id, code]
+      properties:
+        challenge_id:
+          type: string
+        code:
+          type: string
+          description: 6-digit TOTP code.
+
+    CurrentUser:
+      type: object
+      properties:
+        id:
+          type: integer
+        email:
+          type: string
+          format: email
+        employee_id:
+          type: integer
+          nullable: true
+        roles:
+          type: array
+          items:
+            type: string
+        permissions:
+          type: array
+          items:
+            type: string
+
+    Role:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        slug:
+          type: string
+        permissions:
+          type: array
+          items:
+            type: string
+        created_at:
+          type: string
+          format: date-time
+
+    RoleWriteRequest:
+      type: object
+      required: [name, permissions]
+      properties:
+        name:
+          type: string
+        permissions:
+          type: array
+          items:
+            type: string
+
+    EmployeeSummary:
+      type: object
+      description: List-view projection; sensitive fields are masked.
+      properties:
+        id:
+          type: integer
+        employee_code:
+          type: string
+        full_name:
+          type: string
+        work_email:
+          type: string
+          format: email
+        department:
+          type: string
+          nullable: true
+        designation:
+          type: string
+          nullable: true
+        status:
+          type: string
+          enum: [active, inactive, on_notice, exited]
+
+    Employee:
+      type: object
+      description: >
+        Detail view. Sensitive fields (pan, bank_account) are masked (e.g. last
+        4) unless the caller has the explicit permission; full values are never
+        returned in list views and never for unauthorized callers (ADR-006).
+      properties:
+        id:
+          type: integer
+        employee_code:
+          type: string
+        full_name:
+          type: string
+        work_email:
+          type: string
+          format: email
+        manager_id:
+          type: integer
+          nullable: true
+        company_id:
+          type: integer
+        department_id:
+          type: integer
+          nullable: true
+        designation_id:
+          type: integer
+          nullable: true
+        grade_id:
+          type: integer
+          nullable: true
+        location_id:
+          type: integer
+          nullable: true
+        date_of_joining:
+          type: string
+          format: date
+        status:
+          type: string
+          enum: [active, inactive, on_notice, exited]
+        pan_masked:
+          type: string
+          nullable: true
+          description: Masked PAN (e.g. XXXXX1234X). Full value never returned.
+        bank_account_last4:
+          type: string
+          nullable: true
+          description: Last 4 digits only (ADR-006).
+        custom_fields:
+          type: object
+          additionalProperties: true
+        created_at:
+          type: string
+          format: date-time
+
+    EmployeeWriteRequest:
+      type: object
+      required: [full_name, work_email, company_id, date_of_joining]
+      properties:
+        full_name:
+          type: string
+        work_email:
+          type: string
+          format: email
+        employee_code:
+          type: string
+        manager_id:
+          type: integer
+          nullable: true
+        company_id:
+          type: integer
+        department_id:
+          type: integer
+          nullable: true
+        designation_id:
+          type: integer
+          nullable: true
+        grade_id:
+          type: integer
+          nullable: true
+        location_id:
+          type: integer
+          nullable: true
+        date_of_joining:
+          type: string
+          format: date
+        pan:
+          type: string
+          description: Write-only; stored field-encrypted with a blind index (ADR-006). Never returned in plaintext.
+          writeOnly: true
+        bank_account:
+          type: string
+          description: Write-only; stored field-encrypted (ADR-006). Only last 4 returned.
+          writeOnly: true
+        bank_ifsc:
+          type: string
+          writeOnly: true
+        custom_fields:
+          type: object
+          additionalProperties: true
+
+    # ---------- Platform plane (ADR-007 / ADR-008) ----------
+
+    TenantStatus:
+      type: string
+      description: Tenant lifecycle status (ADR-008). provisioning→trial|active→suspended→inactive.
+      enum: [provisioning, trial, active, suspended, inactive]
+
+    PlatformCurrentUser:
+      type: object
+      description: Platform operator identity. Contains ONLY platform.* permissions (never tenant permissions — ADR-007).
+      properties:
+        id: { type: integer }
+        name: { type: string }
+        email: { type: string, format: email }
+        platform_role:
+          $ref: '#/components/schemas/PlatformRole'
+        permissions:
+          type: array
+          items: { type: string, example: platform.tenant.view }
+
+    PlatformSummary:
+      type: object
+      description: Cross-tenant aggregates for the platform dashboard.
+      properties:
+        total_tenants: { type: integer }
+        active_tenants: { type: integer }
+        trial_tenants: { type: integer }
+        suspended_tenants: { type: integer }
+        total_employees: { type: integer }
+        mrr: { type: number }
+        tenant_growth:
+          type: array
+          items:
+            type: object
+            properties:
+              month: { type: string }
+              value: { type: integer }
+        usage_by_plan:
+          type: array
+          items: { $ref: '#/components/schemas/LabeledValue' }
+        tenant_status_split:
+          type: array
+          items: { $ref: '#/components/schemas/LabeledValue' }
+        system_health:
+          type: array
+          items:
+            type: object
+            properties:
+              service: { type: string }
+              status: { type: string, enum: [operational, degraded, down] }
+              uptime: { type: string }
+        recent_activity:
+          type: array
+          items:
+            type: object
+            properties:
+              actor: { type: string }
+              action: { type: string }
+              time: { type: string }
+
+    LabeledValue:
+      type: object
+      properties:
+        label: { type: string }
+        value: { type: integer }
+        color: { type: string, nullable: true }
+
+    PlatformTenant:
+      type: object
+      description: Tenant as seen by the platform operator. Administrative fields only — never tenant employee PII.
+      properties:
+        id: { type: integer }
+        name: { type: string }
+        subdomain: { type: string }
+        status: { $ref: '#/components/schemas/TenantStatus' }
+        plan: { type: string }
+        employees: { type: integer }
+        companies: { type: integer }
+        primary_contact: { type: string }
+        contact_email: { type: string, format: email }
+        region: { type: string }
+        mrr: { type: number }
+        trial_ends_at: { type: string, format: date-time, nullable: true }
+        health: { type: string, enum: [healthy, degraded, down] }
+        created_at: { type: string, format: date-time }
+
+    PlatformTenantDetail:
+      allOf:
+        - $ref: '#/components/schemas/PlatformTenant'
+        - type: object
+          properties:
+            admin_name: { type: string, nullable: true }
+            admin_email: { type: string, format: email, nullable: true }
+            storage_gb: { type: number }
+            api_calls_30d: { type: integer }
+            subscription:
+              $ref: '#/components/schemas/Subscription'
+
+    Subscription:
+      type: object
+      description: >
+        Tenant subscription record. Phase 1 = RECORD-KEEPING ONLY (ADR-007
+        decision 4): no payment-provider integration. Schema includes
+        billing_metadata so a provider can be introduced later without an
+        architectural change (e.g. external customer/subscription ids).
+      properties:
+        plan: { type: string }
+        status:
+          type: string
+          enum: [trialing, active, past_due, cancelled]
+          description: Subscription status (distinct from tenant lifecycle status).
+        price_per_employee: { type: number }
+        seats: { type: integer }
+        mrr: { type: number }
+        trial_start: { type: string, format: date, nullable: true }
+        trial_end: { type: string, format: date, nullable: true }
+        subscription_start: { type: string, format: date, nullable: true }
+        subscription_end: { type: string, format: date, nullable: true }
+        billing_metadata:
+          type: object
+          additionalProperties: true
+          description: Opaque placeholder for future billing-provider identifiers; unused in Phase 1.
+
+    TenantProvisionRequest:
+      type: object
+      required: [name, subdomain, plan]
+      properties:
+        name: { type: string }
+        subdomain:
+          type: string
+          description: Must be unique and DNS-safe; availability checked before create (ADR-008).
+        plan: { type: string }
+        region: { type: string, default: 'ap-south-1' }
+        primary_contact: { type: string }
+        contact_email: { type: string, format: email }
+
+    TenantConfigureRequest:
+      type: object
+      description: Platform-plane configuration of a tenant. Does NOT touch tenant-owned HR data.
+      properties:
+        plan: { type: string }
+        region: { type: string }
+        primary_contact: { type: string }
+        contact_email: { type: string, format: email }
+        trial_ends_at: { type: string, format: date-time, nullable: true }
+
+    TenantOnboarding:
+      type: object
+      properties:
+        id: { type: integer }
+        name: { type: string }
+        subdomain: { type: string }
+        plan: { type: string }
+        primary_contact: { type: string }
+        stage:
+          type: string
+          enum: [customer_info, subdomain, admin_invite, provisioning, activated]
+        progress: { type: integer, description: 0-100 }
+        tenant_id: { type: integer, nullable: true }
+        started_at: { type: string, format: date-time }
+
+    TenantOnboardingRequest:
+      type: object
+      required: [name, subdomain, plan, admin_full_name, admin_email]
+      properties:
+        name: { type: string }
+        subdomain: { type: string }
+        plan: { type: string }
+        region: { type: string, default: 'ap-south-1' }
+        primary_contact: { type: string }
+        contact_email: { type: string, format: email }
+        admin_full_name: { type: string }
+        admin_email: { type: string, format: email }
+
+    PlatformUser:
+      type: object
+      properties:
+        id: { type: integer }
+        name: { type: string }
+        email: { type: string, format: email }
+        platform_role:
+          $ref: '#/components/schemas/PlatformRole'
+        status: { type: string, enum: [active, invited, disabled] }
+        mfa: { type: boolean }
+        last_login: { type: string, format: date-time, nullable: true }
+
+    PlatformRole:
+      type: string
+      description: >
+        Fixed platform role enum (Phase 1 — ADR-007 §4 / decision 6). Configurable
+        platform RBAC is a documented future extension; these are NOT tenant roles.
+      enum: [PLATFORM_SUPER_ADMIN, PLATFORM_SUPPORT, PLATFORM_OPERATIONS, PLATFORM_AUDITOR]
+
+    PlatformUserWriteRequest:
+      type: object
+      required: [name, email, platform_role]
+      properties:
+        name: { type: string }
+        email: { type: string, format: email }
+        platform_role:
+          $ref: '#/components/schemas/PlatformRole'
+
+    PlatformAccessSession:
+      type: object
+      description: >
+        A read-only platform support access session into a tenant (ADR-007 §6).
+        Returns the scoped tenant-context token (read-only) and session metadata.
+      properties:
+        session_id: { type: string }
+        tenant_id: { type: integer }
+        mode: { type: string, enum: [read_only], description: Phase 1 is read-only only. }
+        reason: { type: string }
+        token:
+          type: string
+          description: Scoped tenant-context token (audience "tenant", read-only, platform_access=true).
+        token_type: { type: string, example: Bearer }
+        expires_at:
+          type: string
+          format: date-time
+          description: Max 15 minutes from issue (ADR-007 §6).
+        started_by: { type: string, description: Platform actor. }
+
+    PlatformAuditEntry:
+      type: object
+      description: Append-only platform audit record (ADR-003 / ADR-007 §5).
+      properties:
+        id: { type: integer }
+        timestamp: { type: string, format: date-time }
+        actor: { type: string, description: Platform operator identity. }
+        action: { type: string }
+        target: { type: string, description: Target tenant/entity. }
+        category:
+          type: string
+          enum: [tenant_lifecycle, platform_config, security, billing, access]
+        ip: { type: string }
+        device: { type: string }
+
+    PlatformPlan:
+      type: object
+      properties:
+        tier: { type: string }
+        name: { type: string }
+        price_per_employee: { type: number }
+        min_commit: { type: integer }
+        max_employees: { type: integer, nullable: true }
+        features:
+          type: array
+          items: { type: string }
+        tenants: { type: integer, description: Count of tenants on this plan. }
+
+    PlatformSettings:
+      type: object
+      properties:
+        default_region: { type: string }
+        default_plan: { type: string }
+        default_trial_days:
+          type: integer
+          default: 30
+          description: Configurable trial length (ADR-008 decision 7); default 30 days.
+        trial_expiry_behavior:
+          type: string
+          enum: [suspend, grace]
+          default: suspend
+          description: What happens when a trial ends without conversion (Phase-1 default = suspend).
+        onboarding_defaults:
+          type: object
+          additionalProperties: true
+        platform_mfa_required:
+          type: boolean
+          default: true
+          description: Always true in Phase 1 (ADR-007 §3); exposed read-only.
+        platform_session_minutes: { type: integer }
+        inactive_retention_days:
+          type: integer
+          nullable: true
+          description: >
+            DPDP/legal retention before purge of inactive tenants. NULL = no
+            auto-purge (default) until legal sign-off (ADR-008 open question).
+        support_identity: { type: string, nullable: true }

@@ -158,20 +158,20 @@ Legend: ✔ in Sprint 0 contract · ⚠ API gap.
 |---|---|---|---|---|---|
 | `/audit` | Audit log (Mongo via facade) | TA,HRA(view),PA(view) | `audit.view` | ⚠ `/audit` | DataTable, DiffViewer |
 
-## Platform (Super Admin — SEPARATE CONSOLE, implemented in the demo)
-Platform-level operator experience, outside the tenant subdomain and tenant role model. Own route group `(platform)`, own session/shell/nav, `platform.*` permissions. APIs are gaps (API_GAPS § Platform console); demo-backed.
+## Platform (Super Admin — SEPARATE CONSOLE, same base domain)
+Platform-level operator experience, outside the tenant subdomain and tenant role model. Own route group `(platform)`, own session/shell/nav, `platform.*` permissions (fixed role enum). Served on the same base domain (`app.example.com/platform/*`, no admin host — ADR-007 decision 2). APIs are **in-contract** (`/platform/*`, `platformAuth`); FE console is demo-backed pending live-switch.
 | Route | Purpose | Roles | Perms | API | Components |
 |---|---|---|---|---|---|
-| `/platform/login` | Platform operator sign-in | SA | – | ⚠ platform auth | AuthCard, Form |
-| `/platform` | Platform dashboard (tenant counts, employees, MRR, growth, system health, activity, security alerts) | SA | `platform.dashboard.view` | ⚠ platform summary | KPI cards, charts, panels |
-| `/platform/tenants` | Tenant list (search/filter/status/plan) | SA | `platform.tenant.view` | ⚠ platform tenants | DataTable, Filters |
-| `/platform/tenants/{id}` | Tenant detail (overview, admin, subscription, usage, activity, audit) + activate/suspend + View tenant | SA | `platform.tenant.*` | ⚠ | Tabs, Timeline, Confirm |
-| `/platform/onboarding` | Tenant onboarding wizard (customer → subdomain → plan → admin → provision) | SA | `platform.tenant.create` | ⚠ onboarding | Stepper, Form |
-| `/platform/users` | Platform users (Super Admin/Operator/Support/Billing) | SA | `platform.user.view` | ⚠ platform users | DataTable |
-| `/platform/audit` | Platform audit (tenant lifecycle, config, security, billing, access) | SA | `platform.audit.view` | ⚠ platform audit | DataTable |
-| `/platform/settings` | Plans & settings (subscription plans, onboarding defaults, system) | SA | `platform.settings.view` | ⚠ platform plans/settings | Form sections |
+| `/platform/login` | Platform operator sign-in (separate from tenant login) | SA | – | ✅ `/platform/auth/*` | AuthCard, Form |
+| `/platform` | Platform dashboard (tenant counts, employees, MRR, growth, system health, activity, security alerts) | SA | `platform.dashboard.view` | ✅ `/platform/summary` | KPI cards, charts, panels |
+| `/platform/tenants` | Tenant list (search/filter/status/plan) | SA | `platform.tenant.view` | ✅ `/platform/tenants` | DataTable, Filters |
+| `/platform/tenants/{id}` | Tenant detail (overview, admin, subscription, usage, activity, audit) + activate/suspend/reactivate + read-only access | SA | `platform.tenant.*` | ✅ | Tabs, Timeline, Confirm |
+| `/platform/onboarding` | Tenant onboarding wizard (customer → subdomain → plan → admin → provision) | SA | `platform.tenant.create` | ✅ `/platform/onboarding` | Stepper, Form |
+| `/platform/users` | Platform users (fixed role enum) | SA | `platform.user.view` | ✅ `/platform/users` | DataTable |
+| `/platform/audit` | Platform audit (`platform_audit_logs`: tenant lifecycle, config, security, billing, access) | SA | `platform.audit.view` | ✅ `/platform/audit` | DataTable |
+| `/platform/settings` | Plans & settings (plans, onboarding defaults incl. 30-day trial, system) | SA | `platform.settings.view` | ✅ `/platform/plans`,`/settings` | Form sections |
 
-Tenant impersonation: "View tenant" (perm `platform.tenant.impersonate`) enters the existing tenant `(app)` application with an impersonation banner. Demo-only affordance; production is an audited, consent-gated session (API_GAPS).
+Platform→tenant access: a **read-only** support access session (perm `platform.tenant.access`, mandatory reason, ≤15-min TTL, read-only banner) via `POST /platform/tenants/{id}/access-sessions` — in-contract (ADR-007 §6). The FE demo's "View tenant" impersonation is **ahead of the contract** and must be reconciled to this read-only session (API_GAPS § FE demo ahead of contract). Write impersonation is deferred.
 
 
 ---
