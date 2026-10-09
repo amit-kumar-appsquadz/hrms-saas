@@ -36,5 +36,26 @@ Route::get('/health', function (Request $request) {
 // Deny-by-default placeholder group. Real platform-plane endpoints are added by
 // later B1 tasks behind the `platform` guard.
 Route::middleware('platform')->group(function () {
-    // No platform-plane business routes in B1-00 (foundations only).
+    // B1-03 probe route: NOT a business endpoint. It exists so the plane boundary
+    // (platform-audience guard + per-permission authorizer) is exercised end-to-end
+    // through the real middleware stack by the feature tests. Requires a valid
+    // platform-audience token (EnsurePlatformAudience) AND the `platform.dashboard.view`
+    // permission (platform.authorize). Real endpoints land in B2+.
+    Route::get('/_probe', function () {
+        return response()->json([
+            'plane' => 'platform',
+            'actor' => optional(auth('platform')->user())->getAuthIdentifier(),
+        ]);
+    })
+        ->middleware('platform.authorize:platform.dashboard.view')
+        ->name('platform.probe');
+
+    // Second probe guarding a high-privilege permission (`platform.user.manage`,
+    // granted only to PLATFORM_SUPER_ADMIN) so the per-permission authorizer's
+    // 403 path is exercised end-to-end.
+    Route::get('/_probe-manage', function () {
+        return response()->json(['plane' => 'platform', 'scope' => 'user.manage']);
+    })
+        ->middleware('platform.authorize:platform.user.manage')
+        ->name('platform.probe.manage');
 });

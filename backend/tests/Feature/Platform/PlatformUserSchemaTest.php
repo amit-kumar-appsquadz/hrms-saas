@@ -68,7 +68,9 @@ class PlatformUserSchemaTest extends TestCase
     {
         foreach (self::FIXED_PLATFORM_ROLES as $role) {
             $user = PlatformUser::factory()->create(['platform_role' => $role]);
-            $this->assertSame($role, $user->fresh()->platform_role);
+            // `platform_role` is cast to the PlatformRole enum (B1-03). The stored
+            // string value must still equal the fixed role string.
+            $this->assertSame($role, $user->fresh()->platform_role->value);
         }
     }
 
@@ -97,7 +99,9 @@ class PlatformUserSchemaTest extends TestCase
         // Guards the invariant on every driver: exactly the four ADR-007 §4
         // roles, nothing more, nothing less.
         $factoryRole = PlatformUser::factory()->make()->platform_role;
-        $this->assertContains($factoryRole, self::FIXED_PLATFORM_ROLES);
+        // `platform_role` is cast to the PlatformRole enum (B1-03); compare its
+        // backing string against the fixed set.
+        $this->assertContains($factoryRole->value, self::FIXED_PLATFORM_ROLES);
 
         $this->assertCount(4, self::FIXED_PLATFORM_ROLES);
         $this->assertNotContains('PLATFORM_GOD_MODE', self::FIXED_PLATFORM_ROLES);

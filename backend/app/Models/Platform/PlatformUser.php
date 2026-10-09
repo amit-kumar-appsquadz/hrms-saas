@@ -2,6 +2,7 @@
 
 namespace App\Models\Platform;
 
+use App\Platform\PlatformRole;
 use Database\Factories\Platform\PlatformUserFactory;
 use Illuminate\Database\Eloquent\Factories\Factory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -80,8 +81,10 @@ class PlatformUser extends Authenticatable
      *
      * `password` => 'hashed' delegates to the framework hasher, so assigning a
      * plaintext password hashes it automatically (same mechanism as the tenant
-     * User model). `platform_role` stays a plain string until B1-03 introduces
-     * the `PlatformRole` enum class and swaps this to an enum cast.
+     * User model). `platform_role` is cast to the fixed {@see PlatformRole} enum
+     * (B1-03): reads return a PlatformRole; writes accept the enum or its backing
+     * string. The stored string values are IDENTICAL to the four pinned by B1-02's
+     * migration — the cast adds no new values.
      *
      * @return array<string, string>
      */
@@ -89,6 +92,7 @@ class PlatformUser extends Authenticatable
     {
         return [
             'password' => 'hashed',
+            'platform_role' => PlatformRole::class,
             'mfa_enabled' => 'boolean',
             'last_login_at' => 'datetime',
         ];
