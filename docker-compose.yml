@@ -1,0 +1,121 @@
+# B1-08 — Local dev/test stack for the HRMS platform.
+#
+# Brings up the four backing services the backend needs, each with a HEALTHCHECK
+# so `docker compose up --wait` blocks until everything is actually ready:
+#   - MySQL        : transactional data (RDS stand-in)
+#   - MongoDB      : audit logs / attendance punches (MongoDB Atlas stand-in, ADR-003)
+#   - Redis        : cache + queue
+#   - MinIO        : object storage (S3 stand-in)  + a one-shot bucket creator
+#
+# NO cloud calls. NO real secrets — all credentials are weak, committed, dev-only
+# defaults (see .env.docker.example). Production credentials come from AWS Secrets
+# Manager via Terraform (devops, Sprint 7+), never from this file.
+#
+# Run:
+#   cp .env.docker.example .env.docker
+#   docker compose --env-file .env.docker up -d --wait
+#   docker compose ps          # all services should read "healthy"
+#   docker compose down -v      # tear down + drop volumes (ephemeral)
+#
+# The ${VAR:-default} fallbacks mean this file also works with no env file at all.
+
+name: hrms-local
+
+services:
+  mysql:
+    image: mysql:8.0
+    command:
+      - --default-authentication-plugin=mysql_native_password
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+    environment:
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-hrms}
+      MYSQL_USER: ${MYSQL_USER:-hrms}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-hrms_local_dev_only}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-root_local_dev_only}
+    ports:
+      - "${MYSQL_PORT:-3306}:3306"
+    volumes:
+      - mysql-data:/var/lib/mysql
+      - ./docker/mysql/init.sql:/docker-entrypoint-initdb.d/10-init.sql:ro
+    healthcheck:
+      # authenticated ping so "healthy" means "accepting real connections"
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-u", "root", "-p${MYSQL_ROOT_PASSWORD:-root_local_dev_only}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    restart: unless-stopped
+
+  mongo:
+    image: mongo:7
+    environment:
+      MONGO_INITDB_DATABASE: ${MONGO_INITDB_DATABASE:-hrms_audit}
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_INITDB_ROOT_USERNAME:-hrms}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_INITDB_ROOT_PASSWORD:-mongo_local_dev_only}
+    ports:
+      - "${MONGO_PORT:-27017}:27017"
+    volumes:
+      - mongo-data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    command: ["redis-server", "--appendonly", "yes"]
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+      start_period: 5s
+    restart: unless-stopped
+
+  minio:
+    image: minio/minio:latest
+    command: ["server", "/data", "--console-address", ":9001"]
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-hrms_minio_dev}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minio_local_dev_only}
+    ports:
+      - "${MINIO_API_PORT:-9000}:9000"
+      - "${MINIO_CONSOLE_PORT:-9001}:9001"
+    volumes:
+      - minio-data:/data
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    restart: unless-stopped
+
+  # one-shot: create the dev bucket then exit 0. Not part of health gating.
+  minio-setup:
+    image: minio/mc:latest
+    depends_on:
+      minio:
+        condition: service_healthy
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-hrms_minio_dev}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minio_local_dev_only}
+      MINIO_DEFAULT_BUCKET: ${MINIO_DEFAULT_BUCKET:-hrms-local}
+    entrypoint: ["/bin/sh", "/scripts/create-bucket.sh"]
+    volumes:
+      - ./docker/minio/create-bucket.sh:/scripts/create-bucket.sh:ro
+    restart: "no"
+
+volumes:
+  mysql-data:
+  mongo-data:
+  redis-data:
+  minio-data:
